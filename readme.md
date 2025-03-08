@@ -10,6 +10,7 @@ https://github.com/user-attachments/assets/41a625e8-e656-4a86-a6b3-8140cdd7d376
 - [Usage](#usage)
 - [Features](#features)
 - [User Interface](#user-interface)
+- [Issues](#issues)
 - [Contributing](#contributing)
 - [Credits](#credits)
 
@@ -48,6 +49,9 @@ To use AudioFlow, simply open the application and AudioFlow will automatically s
 
 ## User Interface
 <img src="assets/demo/ui.png" width="320">
+
+## Issues
+Audioflow is currently incompatible with bluetooth audio devices.
 
 ## Contributing
 All contributions are welcome. Whether you're fixing a bug, adding a new feature, or have an issue, feel free to open a pull request/issue/etc.
