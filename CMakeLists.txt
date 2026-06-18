@@ -22,7 +22,7 @@ set(SOURCES
         fileutils/globals.cpp
         )
 
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ../build)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ./build)
 
 add_executable(AudioFlow ${SOURCES})
 
