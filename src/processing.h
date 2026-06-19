@@ -20,6 +20,10 @@ public:
     Processing(const Config& config, const Processing* old, double volume, float deviceSampleRate);
 
     void process(std::vector<float>& input);
+
+    void setReverbToggle(bool toggle);
+    void setReverbDryWet(double dryWet);
+    void setReverbIRFile(const std::string& path);
 private:
     double volume;
     float deviceSampleRate;

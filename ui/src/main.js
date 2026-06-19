@@ -70,6 +70,21 @@ ipcMain.handle('setOutputDevice', async (event, name) => {
     return result.success || false;
 });
 
+ipcMain.handle('setReverbToggle', async (event, toggle) => {
+    const result = await sendCommand({ action: 'setReverbToggle', toggle });
+    return result.success || false;
+});
+
+ipcMain.handle('setReverbDryWet', async (event, dryWet) => {
+    const result = await sendCommand({ action: 'setReverbDryWet', dryWet });
+    return result.success || false;
+});
+
+ipcMain.handle('setReverbIRFile', async (event, path) => {
+    const result = await sendCommand({ action: 'setReverbIRFile', path });
+    return result.success || false;
+});
+
 ipcMain.handle('resizeWindow', async (event, width, height) => {
     if (win && !win.isDestroyed()) {
         win.setContentSize(width, height);

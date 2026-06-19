@@ -78,3 +78,19 @@ void Processing::process(std::vector<float>& input) {
     std::lock_guard<std::mutex> lock(swapMutex);
     convolutionReverb->process(input);
 }
+
+void Processing::setReverbToggle(bool toggle) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    convolutionReverb->setToggle(toggle);
+}
+
+void Processing::setReverbDryWet(double dryWet) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    convolutionReverb->setDryWet(dryWet);
+}
+
+void Processing::setReverbIRFile(const std::string& path) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    auto newConvolutionReverb = std::make_shared<ConvolutionReverb>(convolutionReverb->getToggle(), path, convolutionReverb->getDryWet(), deviceSampleRate);
+    convolutionReverb = std::move(newConvolutionReverb);
+}

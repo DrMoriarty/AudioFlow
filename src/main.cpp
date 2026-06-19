@@ -365,6 +365,27 @@ void handleCommand(const std::string& line) {
             bool success = setOutputDevice(deviceName);
             json response = {{"success", success}};
             std::cout << response.dump() << std::endl;
+        } else if (action == "setReverbToggle") {
+            bool toggle = cmd["toggle"];
+            audioProcessorMutex.lock();
+            audioProcessor->setReverbToggle(toggle);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setReverbDryWet") {
+            double dryWet = cmd["dryWet"];
+            audioProcessorMutex.lock();
+            audioProcessor->setReverbDryWet(dryWet);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setReverbIRFile") {
+            std::string path = cmd["path"];
+            audioProcessorMutex.lock();
+            audioProcessor->setReverbIRFile(path);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
         } else {
             json response = {{"error", "unknown action"}};
             std::cout << response.dump() << std::endl;

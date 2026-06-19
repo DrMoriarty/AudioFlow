@@ -118,9 +118,10 @@ selectEqualizerPreset.addEventListener('change', function () {
     }
     renderConfig();
 })
-selectReverbPreset.addEventListener('change', function () {
+selectReverbPreset.addEventListener('change', async function () {
     configJSON['reverb']['ir'] = reverbPresets[selectReverbPreset.value];
     writeConfigToFile();
+    await window.electronAPI.setReverbIRFile(configJSON['reverb']['ir']);
     renderConfig();
 })
 
@@ -141,9 +142,10 @@ equalizerToggle.oninput = function () {
     renderConfig();
 }
 
-reverbToggle.oninput = function () {
+reverbToggle.oninput = async function () {
     configJSON['reverb']['toggle'] = this.checked;
     writeConfigToFile();
+    await window.electronAPI.setReverbToggle(this.checked);
     renderConfig();
 }
 
@@ -245,18 +247,22 @@ for (let i = 0; i < sliderContainers.length; i++) {
 };
 
 // Set event listeners for reverb unit
-drywetSlider.oninput = function () {
-    configJSON['reverb']['dw'] = parseFloat(this.value) / 100;
+drywetSlider.oninput = async function () {
+    const value = parseFloat(this.value) / 100;
+    configJSON['reverb']['dw'] = value;
     writeConfigToFile();
+    await window.electronAPI.setReverbDryWet(value);
     renderConfig();
 };
 
-drywetBox.onkeydown = function(e) {
+drywetBox.onkeydown = async function(e) {
     if (e.keyCode == 13) {
         drywetBox.blur();
         if (!(isNaN(parseFloat(this.value)) || this.value < 0 || this.value > 100)) {
-            configJSON['reverb']['dw'] = parseFloat(this.value) / 100;
+            const value = parseFloat(this.value) / 100;
+            configJSON['reverb']['dw'] = value;
             writeConfigToFile();
+            await window.electronAPI.setReverbDryWet(value);
         }
         renderConfig();
     }

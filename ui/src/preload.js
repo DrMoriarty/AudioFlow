@@ -49,5 +49,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAvailableOutputDevices: () => ipcRenderer.invoke('getAvailableOutputDevices'),
     getCurrentOutputDeviceName: () => ipcRenderer.invoke('getCurrentOutputDeviceName'),
     setOutputDevice: (name) => ipcRenderer.invoke('setOutputDevice', name),
+    setReverbToggle: (toggle) => ipcRenderer.invoke('setReverbToggle', toggle),
+    setReverbDryWet: (dryWet) => ipcRenderer.invoke('setReverbDryWet', dryWet),
+    setReverbIRFile: (path) => ipcRenderer.invoke('setReverbIRFile', path),
     resizeWindow: (width, height) => ipcRenderer.invoke('resizeWindow', width, height),
 });
