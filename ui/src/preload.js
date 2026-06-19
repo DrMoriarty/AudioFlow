@@ -52,5 +52,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setReverbToggle: (toggle) => ipcRenderer.invoke('setReverbToggle', toggle),
     setReverbDryWet: (dryWet) => ipcRenderer.invoke('setReverbDryWet', dryWet),
     setReverbIRFile: (path) => ipcRenderer.invoke('setReverbIRFile', path),
+    setEqualizerToggle: (toggle) => ipcRenderer.invoke('setEqualizerToggle', toggle),
+    setAmplifierGain: (gain) => ipcRenderer.invoke('setAmplifierGain', gain),
+    setEqualizerBand: (index, f, q, g) => ipcRenderer.invoke('setEqualizerBand', index, f, q, g),
     resizeWindow: (width, height) => ipcRenderer.invoke('resizeWindow', width, height),
 });

@@ -85,6 +85,21 @@ ipcMain.handle('setReverbIRFile', async (event, path) => {
     return result.success || false;
 });
 
+ipcMain.handle('setEqualizerToggle', async (event, toggle) => {
+    const result = await sendCommand({ action: 'setEqualizerToggle', toggle });
+    return result.success || false;
+});
+
+ipcMain.handle('setAmplifierGain', async (event, gain) => {
+    const result = await sendCommand({ action: 'setAmplifierGain', gain });
+    return result.success || false;
+});
+
+ipcMain.handle('setEqualizerBand', async (event, index, f, q, g) => {
+    const result = await sendCommand({ action: 'setEqualizerBand', index, f, q, g });
+    return result.success || false;
+});
+
 ipcMain.handle('resizeWindow', async (event, width, height) => {
     if (win && !win.isDestroyed()) {
         win.setContentSize(width, height);

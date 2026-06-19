@@ -386,6 +386,31 @@ void handleCommand(const std::string& line) {
             audioProcessorMutex.unlock();
             json response = {{"success", true}};
             std::cout << response.dump() << std::endl;
+        } else if (action == "setEqualizerToggle") {
+            bool toggle = cmd["toggle"];
+            audioProcessorMutex.lock();
+            audioProcessor->setEqualizerToggle(toggle);
+            audioProcessor->setAmplifierToggle(toggle);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setAmplifierGain") {
+            float gain = cmd["gain"];
+            audioProcessorMutex.lock();
+            audioProcessor->setAmplifierGain(gain);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setEqualizerBand") {
+            int index = cmd["index"];
+            float f = cmd["f"];
+            float q = cmd["q"];
+            float g = cmd["g"];
+            audioProcessorMutex.lock();
+            audioProcessor->setEqualizerBand(index, f, q, g);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
         } else {
             json response = {{"error", "unknown action"}};
             std::cout << response.dump() << std::endl;

@@ -94,3 +94,28 @@ void Processing::setReverbIRFile(const std::string& path) {
     auto newConvolutionReverb = std::make_shared<ConvolutionReverb>(convolutionReverb->getToggle(), path, convolutionReverb->getDryWet(), deviceSampleRate);
     convolutionReverb = std::move(newConvolutionReverb);
 }
+
+void Processing::setEqualizerToggle(bool toggle) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    equalizer->setToggle(toggle);
+}
+
+void Processing::setAmplifierToggle(bool toggle) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    amplifier->setToggle(toggle);
+}
+
+void Processing::setAmplifierGain(float gain) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    amplifier->setGain(gain);
+}
+
+void Processing::setEqualizerBand(int index, float f, float q, float g) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    auto& filters = equalizer->getFilters();
+    if (index >= 0 && index < static_cast<int>(filters.size())) {
+        filters[index].setFrequency(f);
+        filters[index].setQuality(q);
+        filters[index].setGain(g);
+    }
+}

@@ -135,10 +135,11 @@ autoPreampToggle.oninput = function () {
     renderConfig();
 }
 
-equalizerToggle.oninput = function () {
+equalizerToggle.oninput = async function () {
     configJSON['amplifier']['toggle'] = this.checked;
     configJSON['equalizer']['toggle'] = this.checked;
     writeConfigToFile();
+    await window.electronAPI.setEqualizerToggle(this.checked);
     renderConfig();
 }
 
@@ -154,20 +155,24 @@ settingsToggle.oninput = function () {
 }
 
 // Load config values and set event listeners for preamp
-preampSlider.oninput = function () {
+preampSlider.oninput = async function () {
     autoPreampToggle.checked = false;
-    configJSON['amplifier']['g'] = parseFloat(this.value);
+    const value = parseFloat(this.value);
+    configJSON['amplifier']['g'] = value;
     writeConfigToFile();
+    await window.electronAPI.setAmplifierGain(value);
     renderConfig();
 };
 
-preampGainBox.onkeydown = function(e) {
+preampGainBox.onkeydown = async function(e) {
     if (e.keyCode == 13) {
         preampGainBox.blur();
         if (!(isNaN(parseFloat(this.value)) || this.value < -30 || this.value > 30)) {
             autoPreampToggle.checked = false;
-            configJSON['amplifier']['g'] = parseFloat(this.value);
+            const value = parseFloat(this.value);
+            configJSON['amplifier']['g'] = value;
             writeConfigToFile();
+            await window.electronAPI.setAmplifierGain(value);
         }
         renderConfig();
     }
@@ -184,21 +189,23 @@ for (let i = 0; i < sliderContainers.length; i++) {
     eqQBoxes.push(qBox);
     eqGainBoxes.push(gainBox);
 
-    slider.oninput = function() {
+    slider.oninput = async function() {
         configJSON['equalizer']['g'][i] = parseFloat(this.value);
 
         if (autoPreampToggle.checked) {
             const preamp = -Math.max(0, ...configJSON['equalizer']['g']);
             configJSON['amplifier']['g'] = preamp;
+            await window.electronAPI.setAmplifierGain(preamp);
         }
 
         selectEqualizerPreset.value = 'custom';
 
         writeConfigToFile();
+        await window.electronAPI.setEqualizerBand(i, configJSON['equalizer']['f'][i], configJSON['equalizer']['q'][i], configJSON['equalizer']['g'][i]);
         renderConfig();
     }
 
-    fBox.onkeydown = function(e) {
+    fBox.onkeydown = async function(e) {
         if (e.keyCode == 13) {
             fBox.blur();
             if (!(isNaN(parseFloat(this.value)) || this.value <= 0 || this.value > 16000)) {
@@ -207,12 +214,13 @@ for (let i = 0; i < sliderContainers.length; i++) {
                 selectEqualizerPreset.value = 'custom';
 
                 writeConfigToFile();
+                await window.electronAPI.setEqualizerBand(i, configJSON['equalizer']['f'][i], configJSON['equalizer']['q'][i], configJSON['equalizer']['g'][i]);
             }
             renderConfig();
         }
     }
 
-    qBox.onkeydown = function(e) {
+    qBox.onkeydown = async function(e) {
         if (e.keyCode == 13) {
             qBox.blur();
             if (!(isNaN(parseFloat(this.value)) || this.value <= 0 || this.value > 10)) {
@@ -221,12 +229,13 @@ for (let i = 0; i < sliderContainers.length; i++) {
                 selectEqualizerPreset.value = 'custom';
 
                 writeConfigToFile();
+                await window.electronAPI.setEqualizerBand(i, configJSON['equalizer']['f'][i], configJSON['equalizer']['q'][i], configJSON['equalizer']['g'][i]);
             }
             renderConfig();
         }
     }
 
-    gainBox.onkeydown = function(e) {
+    gainBox.onkeydown = async function(e) {
         if (e.keyCode == 13) {
             gainBox.blur();
             if (!(isNaN(parseFloat(this.value)) || this.value < -30 || this.value > 30)) {
@@ -235,11 +244,13 @@ for (let i = 0; i < sliderContainers.length; i++) {
                 if (autoPreampToggle.checked) {
                     const preamp = -Math.max(0, ...configJSON['equalizer']['g']);
                     configJSON['amplifier']['g'] = preamp;
+                    await window.electronAPI.setAmplifierGain(preamp);
                 }
 
                 selectEqualizerPreset.value = 'custom';
 
                 writeConfigToFile();
+                await window.electronAPI.setEqualizerBand(i, configJSON['equalizer']['f'][i], configJSON['equalizer']['q'][i], configJSON['equalizer']['g'][i]);
             }
             renderConfig()
         }

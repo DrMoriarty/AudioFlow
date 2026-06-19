@@ -24,6 +24,11 @@ public:
     void setReverbToggle(bool toggle);
     void setReverbDryWet(double dryWet);
     void setReverbIRFile(const std::string& path);
+
+    void setEqualizerToggle(bool toggle);
+    void setAmplifierToggle(bool toggle);
+    void setAmplifierGain(float gain);
+    void setEqualizerBand(int index, float f, float q, float g);
 private:
     double volume;
     float deviceSampleRate;
