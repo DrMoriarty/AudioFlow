@@ -134,7 +134,7 @@ bool setDefaultSystemOutputDevice(UInt32 deviceID) {
     UInt32 dataSize = sizeof(deviceID);
     status = AudioObjectSetPropertyData(kAudioObjectSystemObject, &propertyAddress, 0, nullptr, dataSize, &deviceID);
     if (status != noErr) {
-        std::cerr << "Error setting default system output device ID." << std::endl;
+        std::cerr << "Error setting default system output device ID: " << deviceID << std::endl;
         return false;
     }
 
@@ -152,7 +152,7 @@ bool setDefaultOutputDevice(UInt32 deviceID) {
     UInt32 dataSize = sizeof(deviceID);
     status = AudioObjectSetPropertyData(kAudioObjectSystemObject, &propertyAddress, 0, nullptr, dataSize, &deviceID);
     if (status != noErr) {
-        std::cerr << "Error setting default output device ID." << std::endl;
+        std::cerr << "Error setting default output device ID: " << deviceID << std::endl;
         return false;
     }
 
@@ -168,7 +168,7 @@ bool setAudioDeviceBufferSize(AudioDeviceID deviceID, UInt32 bufferSizeInFrames)
 
     status = AudioObjectSetPropertyData(deviceID, &propertyAddress, 0, nullptr, sizeof(UInt32), &bufferSizeInFrames);
     if (status != noErr) {
-        std::cerr << "Error setting buffer size: " << status << std::endl;
+        std::cerr << "Error setting buffer size for device: " << deviceID << " Status: " << status << std::endl;
         return false;
     }
 
@@ -187,7 +187,7 @@ float getAudioDeviceVolume(UInt32 deviceID) {
     UInt32 dataSize = sizeof(float);
     status = AudioObjectGetPropertyData(deviceID, &volumeAddress, 0, nullptr, &dataSize, &volume);
     if (status != noErr) {
-        std::cerr << "Error getting volume." << std::endl;
+        std::cerr << "Error getting volume for device: " << deviceID << std::endl;
         return -1.0; // Return a negative value to indicate error
     }
 
@@ -204,7 +204,7 @@ bool setAudioDeviceVolume(UInt32 deviceID, float volume) {
 
     status = AudioObjectSetPropertyData(deviceID, &volumeAddress, 0, nullptr, sizeof(float), &volume);
     if (status != noErr) {
-        std::cerr << "Error setting property data." << std::endl;
+        std::cerr << "Error setting volume for device: " << deviceID << std::endl;
         return false;
     }
 
@@ -216,7 +216,7 @@ bool setAudioDeviceVolume(UInt32 deviceID, float volume) {
 
     status = AudioObjectSetPropertyData(deviceID, &muteAddress, 0, nullptr, sizeof(UInt32), &mute);
     if (status != noErr) {
-        std::cerr << "Error unmuting device." << std::endl;
+        std::cerr << "Error unmuting device: " << deviceID << std::endl;
         return false;
     }
 
@@ -258,16 +258,18 @@ std::vector<std::string> getAvailableOutputDevices() {
     auto devices = getAudioDevices();
 
     for (auto const& [deviceID, name] : devices) {
-        AudioObjectPropertyAddress propAddress;
-        propAddress.mSelector = kAudioDevicePropertyStreams;
-        propAddress.mScope = kAudioObjectPropertyScopeOutput;
-        propAddress.mElement = kAudioObjectPropertyElementMain;
+        if (name != driver && name != driver2) {
+	    AudioObjectPropertyAddress propAddress;
+	    propAddress.mSelector = kAudioDevicePropertyStreams;
+	    propAddress.mScope = kAudioObjectPropertyScopeOutput;
+	    propAddress.mElement = kAudioObjectPropertyElementMain;
 
-        UInt32 dataSize = 0;
-        OSStatus status = AudioObjectGetPropertyDataSize(
-                deviceID, &propAddress, 0, nullptr, &dataSize);
-        if (status == noErr && dataSize > 0) {
-            result.push_back(name);
+	    UInt32 dataSize = 0;
+	    OSStatus status = AudioObjectGetPropertyDataSize(
+							     deviceID, &propAddress, 0, nullptr, &dataSize);
+	    if (status == noErr && dataSize > 0) {
+		result.push_back(name);
+	    }
         }
     }
 
@@ -434,13 +436,20 @@ OSStatus defaultDeviceIOProc(
 }
 
 int main() {
+    driverID = 0;
     // Get device IDs
     std::map<UInt32, std::string> ad = getAudioDevices();
     for (auto const& [key, val] : ad) {
-        if (val == driver) {
-            driverID = key;
-        }
+        if (val == driver || val == driver2) {
+	    driverID = key;
+	}
     }
+    if (driverID == 0) {
+	// Driver not installed in OS. Fault.
+	std::cerr << "Install Blackhole driver to your OS in order to use AudioFlow!";
+	return -1;
+    }
+    
     defaultDeviceID = getDefaultOutputDevice();
 
     // Volume and device swaps
@@ -453,10 +462,10 @@ int main() {
     // Set buffer size
     UInt32 bufferSizeInFrames = bufferSize; // Choose your desired buffer size
     if (!setAudioDeviceBufferSize(driverID, bufferSizeInFrames)) {
-        std::cerr << "Failed to set buffer size for driver device." << std::endl;
+        std::cerr << "Failed to set buffer size for driver device: " << driverID << std::endl;
     }
     if (!setAudioDeviceBufferSize(defaultDeviceID, bufferSizeInFrames)) {
-        std::cerr << "Failed to set buffer size for default output device." << std::endl;
+        std::cerr << "Failed to set buffer size for default output device: " << defaultDeviceID << std::endl;
     }
 
     config.loadConfig();

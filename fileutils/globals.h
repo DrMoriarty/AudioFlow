@@ -8,6 +8,7 @@
 #include <string>
 
 extern std::string driver;
+extern std::string driver2;
 extern int bufferSize;
 extern int smootherSteps;
 extern int volumeSmootherSteps;
