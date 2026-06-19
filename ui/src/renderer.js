@@ -20,6 +20,8 @@ const selectReverbPreset = document.getElementById('selectReverbPreset')
 const drywetSlider = document.getElementById('drywetSlider');
 const drywetBox = document.getElementById('drywetBox');
 
+const selectOutputDevice = document.getElementById('selectOutputDevice');
+
 // Presets
 let equalizerPresets = {};
 let reverbPresets = {};
@@ -63,6 +65,27 @@ const loadPresets = function () {
         selectReverbPreset.appendChild(node);
     }
 }
+
+const loadOutputDevices = async function () {
+    const devices = await window.electronAPI.getAvailableOutputDevices();
+    const currentDevice = await window.electronAPI.getCurrentOutputDeviceName();
+
+    selectOutputDevice.innerHTML = '';
+    for (const device of devices) {
+        let node = document.createElement('option');
+        node.value = device;
+        node.text = device;
+        selectOutputDevice.appendChild(node);
+    }
+    selectOutputDevice.value = currentDevice;
+}
+
+selectOutputDevice.addEventListener('change', async function () {
+    const selectedDevice = selectOutputDevice.value;
+    await window.electronAPI.setOutputDevice(selectedDevice);
+    const currentDevice = await window.electronAPI.getCurrentOutputDeviceName();
+    selectOutputDevice.value = currentDevice;
+});
 
 // Set event listeners for presets
 selectEqualizerPreset.addEventListener('change', function () {
@@ -216,6 +239,7 @@ drywetBox.onkeydown = function(e) {
 
 const init = () => {
     loadPresets();
+    loadOutputDevices();
     renderConfig();
 };
 

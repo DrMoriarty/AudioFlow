@@ -1,11 +1,38 @@
-const { app, BrowserWindow } = require('electron')
+const { app, BrowserWindow, ipcMain } = require('electron')
 const { spawn } = require('child_process');
 const path = require('path')
+const readline = require('readline');
 
 const rootPath = path.resolve(path.dirname(__dirname), '..');
 const backendProcess = spawn(path.join(rootPath, '/build/AudioFlow'), [], {
     cwd: path.join(rootPath, '/build')
 });
+
+let commandCallbacks = [];
+let responseBuffer = '';
+
+const rl = readline.createInterface({
+    input: backendProcess.stdout,
+    terminal: false
+});
+
+rl.on('line', (line) => {
+    if (commandCallbacks.length > 0) {
+        const callback = commandCallbacks.shift();
+        try {
+            callback(JSON.parse(line));
+        } catch (e) {
+            callback({ error: 'Failed to parse response' });
+        }
+    }
+});
+
+function sendCommand(command) {
+    return new Promise((resolve) => {
+        commandCallbacks.push(resolve);
+        backendProcess.stdin.write(JSON.stringify(command) + '\n');
+    });
+}
 
 backendProcess.on('exit', (code) => {
     if (code !== 0) {
@@ -17,6 +44,21 @@ backendProcess.on('exit', (code) => {
 backendProcess.on('error', (error) => {
     console.error(`Error executing file: ${error}`);
     app.quit();
+});
+
+ipcMain.handle('getAvailableOutputDevices', async () => {
+    const result = await sendCommand({ action: 'getAvailableOutputDevices' });
+    return result.devices || [];
+});
+
+ipcMain.handle('getCurrentOutputDeviceName', async () => {
+    const result = await sendCommand({ action: 'getCurrentOutputDeviceName' });
+    return result.name || '';
+});
+
+ipcMain.handle('setOutputDevice', async (event, name) => {
+    const result = await sendCommand({ action: 'setOutputDevice', name });
+    return result.success || false;
 });
 
 const createWindow = () => {

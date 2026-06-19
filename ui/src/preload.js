@@ -1,4 +1,4 @@
-const { contextBridge } = require('electron');
+const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -45,5 +45,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
         }
 
         return filesDict;
-    }
+    },
+    getAvailableOutputDevices: () => ipcRenderer.invoke('getAvailableOutputDevices'),
+    getCurrentOutputDeviceName: () => ipcRenderer.invoke('getCurrentOutputDeviceName'),
+    setOutputDevice: (name) => ipcRenderer.invoke('setOutputDevice', name),
 });

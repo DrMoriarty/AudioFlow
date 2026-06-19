@@ -137,6 +137,16 @@
         <input id="drywetSlider" type="range" step="1" min="0" max="100" value="50" class="outline outline-2 outline-slate-900 w-full h-5 bg-slate-800 rounded-md">
     </div>
 </div>
+<div id="settingsContainer" class="rounded-md shadow-xl shadow-inner outline outline-2 outline-slate-800 bg-gradient-to-b from-slate-900 to-slate-800 px-5 py-3 space-y-2 w-full">
+    <div id="settingsHeader" class="flex flex-row justify-between relative">
+        <div class="font-sans font-bold text-2xl text-slate-400">Settings</div>
+    </div>
+    <div id="outputDevice" class="">
+        <div class="font-sans font-medium text-base text-slate-400 py-1">Output device</div>
+        <select id="selectOutputDevice" class="outline outline-2 outline-slate-900 w-full h-7 bg-slate-800 rounded-md font-sans font-medium text-sm text-slate-400 py-1 pl-1 cursor-pointer">
+        </select>
+    </div>
+</div>
 <script src="./renderer.js"></script>
 </body>
 </html>

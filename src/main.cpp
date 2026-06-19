@@ -4,8 +4,13 @@
 #include <map>
 #include <csignal>
 #include <memory>
+#include <thread>
+#include <atomic>
 #include "processing.h"
 #include "../fileutils/globals.h"
+#include "../lib/json.hpp"
+
+using json = nlohmann::json;
 
 UInt32 driverID;
 UInt32 defaultDeviceID;
@@ -20,6 +25,8 @@ std::unique_ptr<Processing> audioProcessor;
 std::mutex audioProcessorMutex;
 
 Config config;
+
+std::atomic<bool> running{true};
 
 std::map<UInt32 , std::string> getAudioDevices() {
     AudioObjectPropertyAddress propAddress;
@@ -308,7 +315,45 @@ bool setOutputDevice(const std::string& name) {
     return true;
 }
 
+void handleCommand(const std::string& line) {
+    try {
+        auto cmd = json::parse(line);
+        std::string action = cmd["action"];
+
+        if (action == "getAvailableOutputDevices") {
+            auto devices = getAvailableOutputDevices();
+            json response = {{"devices", devices}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "getCurrentOutputDeviceName") {
+            std::string name = getCurrentOutputDeviceName();
+            json response = {{"name", name}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setOutputDevice") {
+            std::string deviceName = cmd["name"];
+            bool success = setOutputDevice(deviceName);
+            json response = {{"success", success}};
+            std::cout << response.dump() << std::endl;
+        } else {
+            json response = {{"error", "unknown action"}};
+            std::cout << response.dump() << std::endl;
+        }
+    } catch (const std::exception& e) {
+        json response = {{"error", e.what()}};
+        std::cout << response.dump() << std::endl;
+    }
+}
+
+void commandLoop() {
+    std::string line;
+    while (running && std::getline(std::cin, line)) {
+        if (!line.empty()) {
+            handleCommand(line);
+        }
+    }
+}
+
 void cleanup(int signum) {
+    running = false;
     float driverVolume = getAudioDeviceVolume(driverID);
     setAudioDeviceVolume(defaultDeviceID, driverVolume);
     setDefaultOutputDevice(defaultDeviceID);
@@ -428,6 +473,12 @@ int main() {
 
     std::signal(SIGINT, cleanup);
     std::signal(SIGTERM, cleanup);
-    while (true);
+
+    std::thread cmdThread(commandLoop);
+    cmdThread.detach();
+
+    while (running) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    }
 }
 
