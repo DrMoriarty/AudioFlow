@@ -241,6 +241,16 @@ float getAudioDeviceSampleRate(AudioObjectID deviceID) {
     return static_cast<float>(sampleRate);
 }
 
+OSStatus driverIOProc(
+        AudioObjectID inDevice,
+        const AudioTimeStamp* inNow,
+        const AudioBufferList* inInputData,
+        const AudioTimeStamp* inInputTime,
+        AudioBufferList* outOutputData,
+        const AudioTimeStamp* inOutputTime,
+        void* inClientData
+);
+
 OSStatus defaultDeviceIOProc(
         AudioObjectID inDevice,
         const AudioTimeStamp* inNow,
@@ -316,18 +326,23 @@ bool setOutputDevice(const std::string& name) {
         return true;
     }
 
-    AudioDeviceStop(defaultDeviceID, outputIOProcID);
-    AudioDeviceDestroyIOProcID(defaultDeviceID, outputIOProcID);
-
     float driverVolume = getAudioDeviceVolume(driverID);
     setAudioDeviceVolume(defaultDeviceID, driverVolume);
+
+    AudioDeviceStop(driverID, inputIOProcId);
+    AudioDeviceStop(defaultDeviceID, outputIOProcID);
+    AudioDeviceDestroyIOProcID(driverID, inputIOProcId);
+    AudioDeviceDestroyIOProcID(defaultDeviceID, outputIOProcID);
+
+    sharedBuffer.clear();
+
     defaultDeviceID = newDeviceID;
-    setDefaultOutputDevice(defaultDeviceID);
-    setDefaultSystemOutputDevice(defaultDeviceID);
     setAudioDeviceVolume(defaultDeviceID, 1);
 
     UInt32 bufferSizeInFrames = bufferSize;
-    setAudioDeviceBufferSize(defaultDeviceID, bufferSizeInFrames);
+    if (!setAudioDeviceBufferSize(defaultDeviceID, bufferSizeInFrames)) {
+        std::cerr << "Failed to set buffer size for default output device: " << defaultDeviceID << std::endl;
+    }
 
     deviceSampleRate = getAudioDeviceSampleRate(defaultDeviceID);
     if (deviceSampleRate == 0) {
@@ -341,7 +356,12 @@ bool setOutputDevice(const std::string& name) {
     audioProcessor = std::move(updated);
     audioProcessorMutex.unlock();
 
+    // Create audio device processes
+    AudioDeviceCreateIOProcID(driverID, driverIOProc, nullptr, &inputIOProcId);
     AudioDeviceCreateIOProcID(defaultDeviceID, defaultDeviceIOProc, nullptr, &outputIOProcID);
+
+    // Open the audio device for input or output
+    AudioDeviceStart(driverID, inputIOProcId);
     AudioDeviceStart(defaultDeviceID, outputIOProcID);
 
     return true;
