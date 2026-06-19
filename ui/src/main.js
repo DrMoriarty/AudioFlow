@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain } = require('electron')
+const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const { spawn } = require('child_process');
 const path = require('path')
 const readline = require('readline');
@@ -98,6 +98,17 @@ ipcMain.handle('setAmplifierGain', async (event, gain) => {
 ipcMain.handle('setEqualizerBand', async (event, index, f, q, g) => {
     const result = await sendCommand({ action: 'setEqualizerBand', index, f, q, g });
     return result.success || false;
+});
+
+ipcMain.handle('showOpenFileDialog', async () => {
+    if (!win || win.isDestroyed()) return null;
+    const result = await dialog.showOpenDialog(win, {
+        title: 'Select Impulse Response',
+        filters: [{ name: 'WAV Files', extensions: ['wav'] }],
+        properties: ['openFile']
+    });
+    if (result.canceled || result.filePaths.length === 0) return null;
+    return result.filePaths[0];
 });
 
 ipcMain.handle('resizeWindow', async (event, width, height) => {

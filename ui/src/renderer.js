@@ -17,6 +17,7 @@ let eqQBoxes = [];
 let eqGainBoxes = [];
 
 const selectReverbPreset = document.getElementById('selectReverbPreset')
+const customIRButton = document.getElementById('customIRButton');
 const drywetSlider = document.getElementById('drywetSlider');
 const drywetBox = document.getElementById('drywetBox');
 
@@ -64,7 +65,24 @@ const renderConfig = function () {
     drywetSlider.value = Math.round(configJSON['reverb']['dw'] * 100);
     drywetBox.value = Math.round(configJSON['reverb']['dw'] * 100);
 
-    selectReverbPreset.value = configJSON['reverb']['ir'].split('/').pop().split('.')[0]
+    const irName = configJSON['reverb']['ir'].split('/').pop().split('.')[0];
+    const presetKeys = Object.keys(reverbPresets);
+    const isPreset = presetKeys.includes(irName);
+
+    const existingCustom = selectReverbPreset.querySelector('option[data-custom]');
+    if (existingCustom) existingCustom.remove();
+
+    if (isPreset) {
+        selectReverbPreset.value = irName;
+    } else {
+        const customName = configJSON['reverb']['ir'].split('/').pop();
+        const opt = document.createElement('option');
+        opt.value = customName;
+        opt.textContent = customName;
+        opt.setAttribute('data-custom', 'true');
+        selectReverbPreset.insertBefore(opt, selectReverbPreset.firstChild);
+        selectReverbPreset.value = customName;
+    }
 
     fitWindowToContent();
 }
@@ -119,10 +137,23 @@ selectEqualizerPreset.addEventListener('change', function () {
     renderConfig();
 })
 selectReverbPreset.addEventListener('change', async function () {
-    configJSON['reverb']['ir'] = reverbPresets[selectReverbPreset.value];
+    const value = selectReverbPreset.value;
+    if (reverbPresets[value]) {
+        configJSON['reverb']['ir'] = reverbPresets[value];
+    }
     writeConfigToFile();
     await window.electronAPI.setReverbIRFile(configJSON['reverb']['ir']);
     renderConfig();
+})
+
+customIRButton.addEventListener('click', async function () {
+    const filePath = await window.electronAPI.showOpenFileDialog();
+    if (filePath) {
+        configJSON['reverb']['ir'] = filePath;
+        writeConfigToFile();
+        await window.electronAPI.setReverbIRFile(filePath);
+        renderConfig();
+    }
 })
 
 // Set event listeners for toggles
