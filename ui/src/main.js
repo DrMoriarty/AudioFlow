@@ -16,6 +16,15 @@ const rl = readline.createInterface({
     terminal: false
 });
 
+const errRl = readline.createInterface({
+    input: backendProcess.stderr,
+    terminal: false
+});
+
+errRl.on('line', (line) => {
+    console.error('[AudioFlow]', line);
+});
+
 rl.on('line', (line) => {
     if (commandCallbacks.length > 0) {
         const callback = commandCallbacks.shift();
