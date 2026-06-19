@@ -1,2 +1,10 @@
 /tasks.txt
 /convolution-prototyping
+/ui/out
+/ui/node_modules
+/ui/package-lock.json
+/build/build
+CMakeFiles
+CMakeCache.txt
+cmake_install.cmake
+Makefile
