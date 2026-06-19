@@ -21,6 +21,28 @@ const customIRButton = document.getElementById('customIRButton');
 const drywetSlider = document.getElementById('drywetSlider');
 const drywetBox = document.getElementById('drywetBox');
 
+function updateDryWetBoxPosition() {
+    const slider = drywetSlider;
+    const box = drywetBox;
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const val = parseFloat(slider.value);
+    const percent = (val - min) / (max - min);
+
+    const sliderRect = slider.getBoundingClientRect();
+    const containerRect = slider.parentElement.getBoundingClientRect();
+
+    const trackPadLeft = 6;
+    const trackPadRight = 6;
+    const thumbW = 8;
+
+    const trackWidth = sliderRect.width - trackPadLeft - trackPadRight - thumbW;
+    const px = trackPadLeft + percent * trackWidth + thumbW / 2;
+
+    const offsetLeft = sliderRect.left - containerRect.left + px;
+    box.style.left = offsetLeft - box.offsetWidth / 2 + 'px';
+}
+
 const selectOutputDevice = document.getElementById('selectOutputDevice');
 
 const equalizerBody = document.getElementById('equalizerBody');
@@ -85,6 +107,7 @@ const renderConfig = function () {
     }
 
     fitWindowToContent();
+    requestAnimationFrame(updateDryWetBoxPosition);
 }
 
 const loadPresets = function () {
@@ -127,12 +150,15 @@ selectOutputDevice.addEventListener('change', async function () {
 });
 
 // Set event listeners for presets
-selectEqualizerPreset.addEventListener('change', function () {
+selectEqualizerPreset.addEventListener('change', async function () {
     if (selectEqualizerPreset.value != 'custom') {
         configJSON['equalizer']['f'] = [...equalizerPresets[selectEqualizerPreset.value]['f']];
         configJSON['equalizer']['q'] = [...equalizerPresets[selectEqualizerPreset.value]['q']];
         configJSON['equalizer']['g'] = [...equalizerPresets[selectEqualizerPreset.value]['g']];
         writeConfigToFile();
+        for (let i = 0; i < sliderContainers.length; i++) {
+            await window.electronAPI.setEqualizerBand(i, configJSON['equalizer']['f'][i], configJSON['equalizer']['q'][i], configJSON['equalizer']['g'][i]);
+        }
     }
     renderConfig();
 })
@@ -314,6 +340,9 @@ const init = () => {
     loadPresets();
     loadOutputDevices();
     renderConfig();
+    requestAnimationFrame(updateDryWetBoxPosition);
 };
+
+window.addEventListener('resize', updateDryWetBoxPosition);
 
 init();
