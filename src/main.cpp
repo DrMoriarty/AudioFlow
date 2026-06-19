@@ -216,6 +216,98 @@ bool setAudioDeviceVolume(UInt32 deviceID, float volume) {
     return true;
 }
 
+OSStatus defaultDeviceIOProc(
+        AudioObjectID inDevice,
+        const AudioTimeStamp* inNow,
+        const AudioBufferList* inInputData,
+        const AudioTimeStamp* inInputTime,
+        AudioBufferList* outOutputData,
+        const AudioTimeStamp* inOutputTime,
+        void* inClientData
+);
+
+std::string getCurrentOutputDeviceName() {
+    AudioObjectPropertyAddress propAddress;
+    propAddress.mSelector = kAudioObjectPropertyName;
+    propAddress.mScope = kAudioObjectPropertyScopeGlobal;
+    propAddress.mElement = kAudioObjectPropertyElementMain;
+
+    CFStringRef cfName;
+    UInt32 size = sizeof(CFStringRef);
+    OSStatus status = AudioObjectGetPropertyData(
+            defaultDeviceID, &propAddress, 0, nullptr, &size, &cfName);
+    if (status != noErr) {
+        return "";
+    }
+
+    char name[256];
+    CFStringGetCString(cfName, name, sizeof(name), kCFStringEncodingUTF8);
+    CFRelease(cfName);
+    return std::string(name);
+}
+
+std::vector<std::string> getAvailableOutputDevices() {
+    std::vector<std::string> result;
+    auto devices = getAudioDevices();
+
+    for (auto const& [deviceID, name] : devices) {
+        AudioObjectPropertyAddress propAddress;
+        propAddress.mSelector = kAudioDevicePropertyStreams;
+        propAddress.mScope = kAudioObjectPropertyScopeOutput;
+        propAddress.mElement = kAudioObjectPropertyElementMain;
+
+        UInt32 dataSize = 0;
+        OSStatus status = AudioObjectGetPropertyDataSize(
+                deviceID, &propAddress, 0, nullptr, &dataSize);
+        if (status == noErr && dataSize > 0) {
+            result.push_back(name);
+        }
+    }
+
+    return result;
+}
+
+bool setOutputDevice(const std::string& name) {
+    auto devices = getAudioDevices();
+    UInt32 newDeviceID = 0;
+    bool found = false;
+
+    for (auto const& [id, deviceName] : devices) {
+        if (deviceName == name) {
+            newDeviceID = id;
+            found = true;
+            break;
+        }
+    }
+
+    if (!found) {
+        std::cerr << "Device not found: " << name << std::endl;
+        return false;
+    }
+
+    if (newDeviceID == defaultDeviceID) {
+        return true;
+    }
+
+    AudioDeviceStop(defaultDeviceID, outputIOProcID);
+    AudioDeviceDestroyIOProcID(defaultDeviceID, outputIOProcID);
+
+    float driverVolume = getAudioDeviceVolume(driverID);
+    setAudioDeviceVolume(defaultDeviceID, driverVolume);
+    defaultDeviceID = newDeviceID;
+    setDefaultOutputDevice(defaultDeviceID);
+    setDefaultSystemOutputDevice(defaultDeviceID);
+    setAudioDeviceVolume(defaultDeviceID, 1);
+
+    UInt32 bufferSizeInFrames = bufferSize;
+    setAudioDeviceBufferSize(defaultDeviceID, bufferSizeInFrames);
+
+    AudioDeviceCreateIOProcID(defaultDeviceID, defaultDeviceIOProc, nullptr, &outputIOProcID);
+    AudioDeviceStart(defaultDeviceID, outputIOProcID);
+
+    return true;
+}
+
 void cleanup(int signum) {
     float driverVolume = getAudioDeviceVolume(driverID);
     setAudioDeviceVolume(defaultDeviceID, driverVolume);
