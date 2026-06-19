@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreAudio/CoreAudio.h>
 #include <iostream>
@@ -493,11 +494,9 @@ OSStatus driverIOProc(
         //updateConfig();
 
         bufferMutex.lock();
-        for (size_t j = 0; j < numSamples; ++j) {
-            sharedBuffer.push_back(audioData[j]);
-        }
+        sharedBuffer.insert(sharedBuffer.end(), audioData, audioData + numSamples);
 
-        if (sharedBuffer.size() == 2 * bufferSize) {
+        if (sharedBuffer.size() == 2 * bufferSize) {  // TODO: change processing logic
             audioProcessor->process(sharedBuffer);
         }
         bufferMutex.unlock();
@@ -521,9 +520,10 @@ OSStatus defaultDeviceIOProc(
         UInt32 numSamples = outBuffer.mDataByteSize / sizeof(float);
 
         bufferMutex.lock();
-        for (size_t j = 0; j < numSamples && !sharedBuffer.empty(); ++j) {
-            outputData[j] = sharedBuffer.front();
-            sharedBuffer.erase(sharedBuffer.begin());
+        size_t toCopy = std::min<size_t>(numSamples, sharedBuffer.size());
+        if (toCopy > 0) {
+            std::copy(sharedBuffer.begin(), sharedBuffer.begin() + toCopy, outputData);
+            sharedBuffer.erase(sharedBuffer.begin(), sharedBuffer.begin() + toCopy);
         }
         bufferMutex.unlock();
     }

@@ -12,52 +12,65 @@ IIRFilter::IIRFilter(float f, float q, float g, float sampleRate)
 }
 
 void IIRFilter::process(std::vector<double>& input) {
-    for (size_t n = 0; n < input.size(); ++n) {
-        if (frequency.getRemaining() > 0 || quality.getRemaining() > 0 || gain.getRemaining() > 0) {
+    bool transitioning = frequency.getRemaining() > 0 || quality.getRemaining() > 0 || gain.getRemaining() > 0;
+
+    if (!transitioning) {
+        const double b0 = b_coeffs[0];
+        const double b1 = b_coeffs[1];
+        const double b2 = b_coeffs[2];
+        const double a1 = a_coeffs[1];
+        const double a2 = a_coeffs[2];
+            
+        for (size_t n = 0; n < input.size(); ++n) {
+            double w0 = input[n] - a1 * state[0] - a2 * state[1];
+            double yn = b0 * w0 + b1 * state[0] + b2 * state[1];
+            input[n] = yn;
+
+            for (size_t i = state.size() - 1; i > 0; --i) {
+                state[i] = state[i - 1];
+            }
+            if (!state.empty()) {
+                state[0] = w0;
+            }
+        }
+    } else {
+        for (size_t n = 0; n < input.size(); ++n) {
+
             calculatePeakFilter();
-        }
 
-        double w0 = input[n];
-        for (size_t k = 1; k < a_coeffs.size(); ++k) {
-            w0 -= a_coeffs[k] * state[k - 1];
-        }
+            double w0 = input[n] - a_coeffs[1] * state[0] - a_coeffs[2] * state[1];
+            double yn = b_coeffs[0] * w0 + b_coeffs[1] * state[0] + b_coeffs[2] * state[1];
+            input[n] = yn;
 
-        double yn = b_coeffs[0] * w0;
-        for (size_t k = 1; k < b_coeffs.size(); ++k) {
-            yn += b_coeffs[k] * state[k - 1];
-        }
-        input[n] = yn;
-
-        for (size_t i = state.size() - 1; i > 0; --i) {
-            state[i] = state[i - 1];
-        }
-        if (!state.empty()) {
-            state[0] = w0;
+            for (size_t i = state.size() - 1; i > 0; --i) {
+                state[i] = state[i - 1];
+            }
+            if (!state.empty()) {
+                state[0] = w0;
+            }
         }
     }
 }
 
-void IIRFilter::calculatePeakFilter() {
-    double A = pow(10.0, gain.currentValue() / 40.0);
-    double omega = 2.0 * M_PI * frequency.currentValue() / sampleRate.currentValue();
-    double alpha = sin(omega) / (2.0 * quality.currentValue());
+static const double LN10_OVER_40 = std::log(10.0) / 40.0;
 
-    double a0 = 1.0 + alpha / A;
-    double a1 = -2.0 * cos(omega);
+void IIRFilter::calculatePeakFilter() {
+    double A = std::exp(LN10_OVER_40 * gain.currentValue());
+    double omega = 2.0 * M_PI * frequency.currentValue() / sampleRate.currentValue();
+    double sinOmega = std::sin(omega);
+    double cosOmega = std::cos(omega);
+    double alpha = sinOmega / (2.0 * quality.currentValue());
+
+    double a0_inv = 1.0 / (1.0 + alpha / A);
+    double a1 = -2.0 * cosOmega;
     double a2 = 1.0 - alpha / A;
     double b0 = 1.0 + alpha * A;
-    double b1 = -2.0 * cos(omega);
+    double b1 = -2.0 * cosOmega;
     double b2 = 1.0 - alpha * A;
 
-    a_coeffs = {a0, a1, a2};
-    b_coeffs = {b0, b1, b2};
+    a_coeffs = {1.0, a1 * a0_inv, a2 * a0_inv};
+    b_coeffs = {b0 * a0_inv, b1 * a0_inv, b2 * a0_inv};
 
-    for (auto& coeff : a_coeffs) {
-        coeff /= a0;
-    }
-    for (auto& coeff : b_coeffs) {
-        coeff /= a0;
-    }
 }
 
 float IIRFilter::getFrequency() {

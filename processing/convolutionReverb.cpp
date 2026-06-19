@@ -5,146 +5,134 @@
 #include "convolutionReverb.h"
 #include <iostream>
 
-
 ConvolutionReverb::ConvolutionReverb(bool toggle, std::string path, double dryWet, float deviceSampleRate)
     : AudioProcessor(toggle), path(path), dryWet(Smoother(dryWet, dryWet, 0)), deviceSampleRate(deviceSampleRate) {
+
     chunkSize = convolutionChunkSize;
     paddedSize = chunkSize * 2;
+    numBins = paddedSize / 2;
 
     IRData irData = readIRFile(path);
-    impulseResponse = std::move(irData.audioData);
+    std::vector<float> impulseResponse = std::move(irData.audioData);
     irSampleRate = irData.sampleRate;
     sampleRateMismatch = (irSampleRate != 0 && static_cast<uint32_t>(deviceSampleRate) != irSampleRate);
 
     if (sampleRateMismatch) {
-        std::cerr << "IR sample rate (" << irSampleRate << ") does not match device sample rate (" << deviceSampleRate << "). Reverb will be disabled." << std::endl;
+        std::cerr << "IR sample rate (" << irSampleRate << ") does not match device sample rate ("
+                  << deviceSampleRate << "). Reverb will be disabled." << std::endl;
     }
 
-    impulseResponseFFTs.resize(ceil(static_cast<float>(impulseResponse.size() / chunkSize)));
-    impulseResponse.resize(impulseResponseFFTs.size() * chunkSize, 0);
+    size_t numChunks = static_cast<size_t>(std::ceil(static_cast<float>(impulseResponse.size()) / chunkSize));
+    impulseResponse.resize(numChunks * chunkSize, 0.0f);
 
-    fftSetups.resize(ceil(static_cast<float>(impulseResponse.size() / chunkSize)));
-    for (size_t i = 0; i < fftSetups.size(); ++i) {
-        fftSetups[i] = vDSP_create_fftsetup(log2f(paddedSize), FFT_RADIX2);
+    fftSetup = vDSP_create_fftsetup(static_cast<vDSP_Length>(std::log2(paddedSize)), FFT_RADIX2);
+
+    SplitComplex fftTmp{std::vector<float>(numBins), std::vector<float>(numBins)};
+    std::vector<float> inputBuf(paddedSize, 0.0f);
+
+    for (size_t i = 0; i < numChunks; ++i) {
+        std::copy(impulseResponse.begin() + i * chunkSize,
+                  impulseResponse.begin() + (i + 1) * chunkSize,
+                  inputBuf.begin());
+        std::fill(inputBuf.begin() + chunkSize, inputBuf.end(), 0.0f);
+
+        fftZ(inputBuf, fftTmp.real.data(), fftTmp.imag.data());
+
+        SplitComplex dst{std::vector<float>(numBins), std::vector<float>(numBins)};
+        std::copy(fftTmp.real.begin(), fftTmp.real.end(), dst.real.begin());
+        std::copy(fftTmp.imag.begin(), fftTmp.imag.end(), dst.imag.begin());
+        impulseResponseFFTs.push_back(std::move(dst));
     }
 
-    for (size_t i = 0; i < impulseResponseFFTs.size(); ++i) {
-        std::vector<float> chunked = std::vector<float>(impulseResponse.begin() + i * chunkSize, impulseResponse.begin() + (i + 1) * chunkSize);
-        chunked.resize(paddedSize, 0);
-        impulseResponseFFTs[i] = fft(chunked, vDSP_create_fftsetup(log2f(paddedSize), FFT_RADIX2));
-    }
+    size_t totalSize = (numChunks + 2) * chunkSize;
+    overlap.resize(totalSize, 0.0f);
 
-    overlap.resize(impulseResponseFFTs.size() * chunkSize, 0);
+    fftReal = {std::vector<float>(numBins), std::vector<float>(numBins)};
+    fftImag = {std::vector<float>(numBins), std::vector<float>(numBins)};
+    workerReal = {std::vector<float>(numBins), std::vector<float>(numBins)};
+    workerImag = {std::vector<float>(numBins), std::vector<float>(numBins)};
+    iblitted.resize(paddedSize, 0.0f);
+    overlapReverb.resize(totalSize, 0.0f);
 }
 
-std::vector<std::complex<float>> ConvolutionReverb::fft(const std::vector<float> input, FFTSetup fftSetup) {
-    const size_t n = input.size();
+ConvolutionReverb::~ConvolutionReverb() {
+    if (fftSetup) {
+        vDSP_destroy_fftsetup(fftSetup);
+    }
+}
 
-    std::vector<float> real(n / 2);
-    std::vector<float> imag(n / 2);
-    DSPSplitComplex splitComplex = { real.data(), imag.data() };
-
-    std::vector<float> tempBuffer(input);
-    vDSP_ctoz(reinterpret_cast<DSPComplex*>(tempBuffer.data()), 2, &splitComplex, 1, n / 2);
-
-    vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2(n), FFT_FORWARD);
-
+void ConvolutionReverb::fftZ(const std::vector<float>& input, float* outReal, float* outImag) {
+    DSPSplitComplex sc = { outReal, outImag };
+    vDSP_ctoz(reinterpret_cast<const DSPComplex*>(input.data()), 2, &sc, 1, numBins);
+    vDSP_fft_zrip(fftSetup, &sc, 1, static_cast<vDSP_Length>(std::log2(paddedSize)), FFT_FORWARD);
     float scale = 0.5f;
-    vDSP_vsmul(splitComplex.realp, 1, &scale, splitComplex.realp, 1, n / 2);
-    vDSP_vsmul(splitComplex.imagp, 1, &scale, splitComplex.imagp, 1, n / 2);
-
-    std::vector<std::complex<float>> output(n);
-
-    output[0] = std::complex<float>(splitComplex.realp[0], 0);
-    for (size_t i = 1; i < n / 2; ++i) {
-        output[i] = std::complex<float>(splitComplex.realp[i], splitComplex.imagp[i]);
-        output[n - i] = std::complex<float>(splitComplex.realp[i], -splitComplex.imagp[i]);
-    }
-    output[n / 2] = std::complex<float>(splitComplex.realp[n / 2], 0);
-
-    return output;
+    vDSP_vsmul(outReal, 1, &scale, outReal, 1, numBins);
+    vDSP_vsmul(outImag, 1, &scale, outImag, 1, numBins);
 }
 
-std::vector<float> ConvolutionReverb::ifft(std::vector<std::complex<float>> input, FFTSetup fftSetup) {
-    const size_t n = input.size();
-
-    std::vector<float> real(n);
-    std::vector<float> imag(n);
-
-    for (size_t i = 0; i < input.size(); ++i) {
-        real[i] = input[i].real();
-        imag[i] = input[i].imag();
-    }
-
-    imag[0] = input[n / 2].real();
-    DSPSplitComplex splitComplex;
-    splitComplex.realp = real.data();
-    splitComplex.imagp = imag.data();
-
-    vDSP_fft_zrip(fftSetup, &splitComplex, 1, log2f(n), FFT_INVERSE);
-
-    std::vector<float> output(input.size());
-    float* data = output.data();
-
-    vDSP_ztoc(&splitComplex, 1, reinterpret_cast<COMPLEX*>(data), 2, n / 2);
-    const float factor = 1.0f / static_cast<float>(n);
-    vDSP_vsmul(data, 1, &factor, data, 1, n);
-
-    return output;
+void ConvolutionReverb::ifftZ(float* real, float* imag) {
+    DSPSplitComplex sc = { real, imag };
+    vDSP_fft_zrip(fftSetup, &sc, 1, static_cast<vDSP_Length>(std::log2(paddedSize)), FFT_INVERSE);
+    vDSP_ztoc(&sc, 1, reinterpret_cast<COMPLEX*>(iblitted.data()), 2, numBins);
+    const float factor = 1.0f / static_cast<float>(paddedSize);
+    vDSP_vsmul(iblitted.data(), 1, &factor, iblitted.data(), 1, paddedSize);
 }
-
 
 void ConvolutionReverb::process(std::vector<float>& input) {
     if (sampleRateMismatch) {
         return;
     }
 
-    if (mix.currentValueNoChange() > 0 || mix.getRemaining() > 0) {
-        size_t inputSize = input.size();
-        size_t totalSize = (impulseResponseFFTs.size() + 1) * (chunkSize);
-
-        input.resize(paddedSize, 0);
-        std::vector<std::complex<float>> inputFFT = fft(input, fftSetups[0]);
-
-        std::vector<float> totalInverseFFT(totalSize, 0);
-        std::mutex totalInverseFFTMutex;
-        std::vector<std::thread> threads;
-        for (size_t i = 0; i < impulseResponseFFTs.size(); ++i) {
-            threads.emplace_back([&, i]() {
-                std::vector<std::complex<float>> convolved(inputFFT.size());
-                for (size_t j = 0; j < inputFFT.size(); ++j) {
-                    convolved[j] = inputFFT[j] * impulseResponseFFTs[i][j];
-                }
-
-                std::vector<float> inverseFFT = ifft(convolved, fftSetups[i]);
-
-                totalInverseFFTMutex.lock();
-                for (size_t k = 0; k < inverseFFT.size(); ++k) {
-                    totalInverseFFT[k + i * chunkSize] += inverseFFT[k];
-                }
-                totalInverseFFTMutex.unlock();
-            });
-        }
-
-        for (auto &t: threads) {
-            t.join();
-        }
-
-        std::vector<float> output(inputSize);
-        for (size_t i = 0; i < totalInverseFFT.size(); ++i) {
-            overlap[i] += totalInverseFFT[i];
-        }
-        std::copy(overlap.begin(), overlap.begin() + inputSize, output.begin());
-        overlap.erase(overlap.begin(), overlap.begin() + inputSize);
-        overlap.resize(totalSize);
-
-        for (size_t i = 0; i < output.size(); ++i) {
-            double scale = dryWet.currentValue() * mix.currentValue();
-            output[i] = (output[i] * scale) + (input[i] * (1 - scale));
-        }
-
-        input = output;
+    if (mix.currentValueNoChange() <= 0 && mix.getRemaining() <= 0) {
+        return;
     }
+
+    const size_t inputSize = input.size();
+    const size_t numChunks = impulseResponseFFTs.size();
+    const size_t totalSize = (numChunks + 2) * chunkSize;
+
+    std::vector<float> inputPadded(paddedSize, 0.0f);
+    std::copy(input.begin(), input.end(), inputPadded.begin());
+    fftZ(inputPadded, fftReal.real.data(), fftReal.imag.data());
+
+    std::fill(overlapReverb.begin(), overlapReverb.end(), 0.0f);
+
+    for (size_t i = 0; i < numChunks; ++i) {
+        DSPSplitComplex inSc = fftReal.dsp();
+        DSPSplitComplex irSc = impulseResponseFFTs[i].dsp();
+        DSPSplitComplex outSc = workerReal.dsp();
+        vDSP_zvmul(&inSc, 1, &irSc, 1, &outSc, 1, numBins, 1);
+
+        std::copy(workerReal.real.begin(), workerReal.real.end(), workerImag.real.begin());
+        std::copy(workerReal.imag.begin(), workerReal.imag.end(), workerImag.imag.begin());
+
+        ifftZ(workerImag.real.data(), workerImag.imag.data());
+
+        for (size_t k = 0; k < paddedSize; ++k) {
+            overlapReverb[i * chunkSize + k] += iblitted[k];
+        }
+    }
+
+    for (size_t k = 0; k < totalSize; ++k) {
+        overlap[k] += overlapReverb[k];
+    }
+
+    bool mixConst = dryWet.getRemaining() <= 0 && mix.getRemaining() <= 0;
+    if (mixConst) {
+        float scale = static_cast<float>(dryWet.currentValueNoChange() * mix.currentValueNoChange());
+        float oneMinusScale = 1.0f - scale;
+        for (size_t i = 0; i < inputSize; ++i) {
+            input[i] = overlap[i] * scale + input[i] * oneMinusScale;
+        }
+    } else {
+        for (size_t i = 0; i < inputSize; ++i) {
+            float wetScale = static_cast<float>(dryWet.currentValue() * mix.currentValue());
+            input[i] = overlap[i] * wetScale + input[i] * (1.0f - wetScale);
+        }
+    }
+
+    std::copy(overlap.begin() + inputSize, overlap.begin() + totalSize, overlap.begin());
+    std::fill(overlap.begin() + (totalSize - inputSize), overlap.end(), 0.0f);
 }
 
 double ConvolutionReverb::getDryWet() {

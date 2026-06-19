@@ -23,14 +23,22 @@ void Equalizer::process(std::vector<double>& input) {
     double currentMix = mix.currentValueNoChange();
     double mixRemaining = mix.getRemaining();
 
-    if (currentMix > 0 || mixRemaining > 0) {
-        std::vector<double> processed(input);
-        for (auto &filter: *filters) {
-            filter.process(processed);
+    if (currentMix <= 0 && mixRemaining <= 0) return;
+
+    processed = input;
+    for (auto &filter: *filters) {
+        filter.process(processed);
+    }
+
+    if (mixRemaining <= 0) {
+        double dw = currentMix;
+        for (size_t i = 0; i < input.size(); ++i) {
+            input[i] = processed[i] * dw + input[i] * (1.0 - dw);
         }
+    } else {
         for (size_t i = 0; i < input.size(); ++i) {
             double dw = mix.currentValue();
-            input[i] = (processed[i] * dw) + (input[i] * (1.0 - dw));
+            input[i] = processed[i] * dw + input[i] * (1.0 - dw);
         }
     }
 }

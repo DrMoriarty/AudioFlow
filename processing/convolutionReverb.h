@@ -5,11 +5,11 @@
 #ifndef EQ_CPP_CONVOLUTIONREVERB_H
 #define EQ_CPP_CONVOLUTIONREVERB_H
 
-#include <map>
-#include <thread>
+#include <vector>
+#include <string>
+#include <Accelerate/Accelerate.h>
 #include "smoother.h"
 #include "audioProcessor.h"
-#include <Accelerate/Accelerate.h>
 #include "../fileutils/readIRFile.h"
 #include "../fileutils/globals.h"
 
@@ -19,9 +19,7 @@ public:
     std::string path;
 
     ConvolutionReverb(bool toggle, std::string path, double dryWet, float deviceSampleRate);
-
-    std::vector<std::complex<float>> fft(const std::vector<float> input, FFTSetup fftSetup);
-    std::vector<float> ifft(std::vector<std::complex<float>> input, FFTSetup fftSetup);
+    ~ConvolutionReverb();
 
     double getDryWet();
     void setDryWet(double newDryWet);
@@ -31,14 +29,32 @@ public:
 private:
     size_t chunkSize;
     size_t paddedSize;
+    size_t numBins;
     float deviceSampleRate;
     uint32_t irSampleRate;
     bool sampleRateMismatch;
     Smoother dryWet;
-    std::vector<FFTSetup> fftSetups;
+
+    FFTSetup fftSetup;
+
+    struct SplitComplex {
+        std::vector<float> real;
+        std::vector<float> imag;
+        DSPSplitComplex dsp() { return { real.data(), imag.data() }; }
+    };
+
+    std::vector<SplitComplex> impulseResponseFFTs;
     std::vector<float> overlap;
-    std::vector<float> impulseResponse;
-    std::vector<std::vector<std::complex<float>>> impulseResponseFFTs;
+
+    SplitComplex fftReal;
+    SplitComplex fftImag;
+    SplitComplex workerReal;
+    SplitComplex workerImag;
+    std::vector<float> iblitted;
+    std::vector<float> overlapReverb;
+
+    void fftZ(const std::vector<float>& input, float* outReal, float* outImag);
+    void ifftZ(float* real, float* imag);
 };
 
 

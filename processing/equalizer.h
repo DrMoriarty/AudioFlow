@@ -18,6 +18,7 @@ public:
     std::vector<IIRFilter>& getFilters();
 private:
     std::shared_ptr<std::vector<IIRFilter>> filters;
+    std::vector<double> processed;
 };
 
 
