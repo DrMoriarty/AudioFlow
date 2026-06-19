@@ -5,6 +5,14 @@
 #ifndef EQ_CPP_READIRFILE_H
 #define EQ_CPP_READIRFILE_H
 
-std::vector<float> readIRFile(const std::string &path);
+#include <vector>
+#include <cstdint>
+
+struct IRData {
+    std::vector<float> audioData;
+    uint32_t sampleRate;
+};
+
+IRData readIRFile(const std::string &path);
 
 #endif //EQ_CPP_READIRFILE_H

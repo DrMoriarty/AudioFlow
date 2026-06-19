@@ -8,15 +8,17 @@
 #include "iostream"
 
 
-Processing::Processing(const Config& config, double volume) :
+Processing::Processing(const Config& config, double volume, float deviceSampleRate) :
     config(config),
+    deviceSampleRate(deviceSampleRate),
     amplifier(std::make_shared<Amplifier>(config.ampToggle, config.ampGain)),
-    equalizer(std::make_shared<Equalizer>(config.equalizerToggle, config.equalizerF, config.equalizerQ, config.equalizerG, 48000)),
-    convolutionReverb(std::make_shared<ConvolutionReverb>(config.reverbToggle, config.irFilePath, config.reverbDryWet)),
+    equalizer(std::make_shared<Equalizer>(config.equalizerToggle, config.equalizerF, config.equalizerQ, config.equalizerG, deviceSampleRate)),
+    convolutionReverb(std::make_shared<ConvolutionReverb>(config.reverbToggle, config.irFilePath, config.reverbDryWet, deviceSampleRate)),
     volume(volume) {}
 
-Processing::Processing(const Config& config, const Processing* old, double volume) :
+Processing::Processing(const Config& config, const Processing* old, double volume, float deviceSampleRate) :
         config(config),
+        deviceSampleRate(deviceSampleRate),
         amplifier(std::move(old->amplifier)),
         equalizer(std::move(old->equalizer)),
         convolutionReverb(std::move(old->convolutionReverb)),
@@ -53,10 +55,10 @@ Processing::Processing(const Config& config, const Processing* old, double volum
     }
     if (convolutionReverb->getDryWet() != config.reverbDryWet) {
         convolutionReverb->setDryWet(config.reverbDryWet);
-    } else if (convolutionReverb->path != config.irFilePath) {
-        std::thread ([this, config]() {
+    } else if (convolutionReverb->path != config.irFilePath || convolutionReverb->getDeviceSampleRate() != deviceSampleRate) {
+        std::thread ([this, config, deviceSampleRate]() {
             convolutionReverb->setToggle(false);
-            auto newConvolutionReverb = std::make_shared<ConvolutionReverb>(config.reverbToggle, config.irFilePath, config.reverbDryWet);
+            auto newConvolutionReverb = std::make_shared<ConvolutionReverb>(config.reverbToggle, config.irFilePath, config.reverbDryWet, deviceSampleRate);
 
             std::lock_guard<std::mutex> lock(swapMutex);
             convolutionReverb = std::move(newConvolutionReverb);

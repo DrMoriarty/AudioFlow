@@ -14,6 +14,7 @@ using json = nlohmann::json;
 
 UInt32 driverID;
 UInt32 defaultDeviceID;
+float deviceSampleRate;
 
 AudioDeviceIOProcID inputIOProcId;
 AudioDeviceIOProcID outputIOProcID;
@@ -223,6 +224,23 @@ bool setAudioDeviceVolume(UInt32 deviceID, float volume) {
     return true;
 }
 
+float getAudioDeviceSampleRate(AudioObjectID deviceID) {
+    AudioObjectPropertyAddress propAddress;
+    propAddress.mSelector = kAudioDevicePropertyNominalSampleRate;
+    propAddress.mScope = kAudioObjectPropertyScopeGlobal;
+    propAddress.mElement = kAudioObjectPropertyElementMain;
+
+    Float64 sampleRate = 0;
+    UInt32 dataSize = sizeof(Float64);
+    OSStatus status = AudioObjectGetPropertyData(deviceID, &propAddress, 0, nullptr, &dataSize, &sampleRate);
+    if (status != noErr) {
+        std::cerr << "Error getting sample rate for device: " << deviceID << std::endl;
+        return 0;
+    }
+
+    return static_cast<float>(sampleRate);
+}
+
 OSStatus defaultDeviceIOProc(
         AudioObjectID inDevice,
         const AudioTimeStamp* inNow,
@@ -311,6 +329,18 @@ bool setOutputDevice(const std::string& name) {
     UInt32 bufferSizeInFrames = bufferSize;
     setAudioDeviceBufferSize(defaultDeviceID, bufferSizeInFrames);
 
+    deviceSampleRate = getAudioDeviceSampleRate(defaultDeviceID);
+    if (deviceSampleRate == 0) {
+        std::cerr << "Failed to get device sample rate, defaulting to 48000" << std::endl;
+        deviceSampleRate = 48000.0f;
+    }
+
+    config.loadConfig();
+    auto updated = std::make_unique<Processing>(config, getAudioDeviceVolume(driverID), deviceSampleRate);
+    audioProcessorMutex.lock();
+    audioProcessor = std::move(updated);
+    audioProcessorMutex.unlock();
+
     AudioDeviceCreateIOProcID(defaultDeviceID, defaultDeviceIOProc, nullptr, &outputIOProcID);
     AudioDeviceStart(defaultDeviceID, outputIOProcID);
 
@@ -373,7 +403,7 @@ void cleanup(int signum) {
 void updateConfig() {
     bool upToDate = config.loadConfig();
     if (!upToDate || audioProcessor == nullptr) {
-        auto updated = std::make_unique<Processing>(config, audioProcessor.get(), getAudioDeviceVolume(driverID));
+        auto updated = std::make_unique<Processing>(config, audioProcessor.get(), getAudioDeviceVolume(driverID), deviceSampleRate);
         audioProcessorMutex.lock();
         audioProcessor = std::move(updated);
         audioProcessorMutex.unlock();
@@ -394,7 +424,7 @@ OSStatus driverIOProc(
         float* audioData = (float*)buffer.mData;
         UInt32 numSamples = buffer.mDataByteSize / sizeof(float);
 
-        updateConfig();
+        //updateConfig();
 
         bufferMutex.lock();
         for (size_t j = 0; j < numSamples; ++j) {
@@ -459,6 +489,13 @@ int main() {
     setDefaultSystemOutputDevice(driverID);
     setAudioDeviceVolume(defaultDeviceID, 1);
 
+    // Get device sample rate
+    deviceSampleRate = getAudioDeviceSampleRate(defaultDeviceID);
+    if (deviceSampleRate == 0) {
+        std::cerr << "Failed to get device sample rate, defaulting to 48000" << std::endl;
+        deviceSampleRate = 48000.0f;
+    }
+
     // Set buffer size
     UInt32 bufferSizeInFrames = bufferSize; // Choose your desired buffer size
     if (!setAudioDeviceBufferSize(driverID, bufferSizeInFrames)) {
@@ -469,8 +506,8 @@ int main() {
     }
 
     config.loadConfig();
-    audioProcessor = std::make_unique<Processing>(config, getAudioDeviceVolume(driverID));
-    audioProcessor = std::make_unique<Processing>(config, audioProcessor.get(), getAudioDeviceVolume(driverID));
+    audioProcessor = std::make_unique<Processing>(config, getAudioDeviceVolume(driverID), deviceSampleRate);
+    audioProcessor = std::make_unique<Processing>(config, audioProcessor.get(), getAudioDeviceVolume(driverID), deviceSampleRate);
 
     // Create audio device processes
     AudioDeviceCreateIOProcID(driverID, driverIOProc, nullptr, &inputIOProcId);

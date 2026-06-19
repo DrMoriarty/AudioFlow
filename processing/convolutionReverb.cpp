@@ -3,12 +3,23 @@
 //
 
 #include "convolutionReverb.h"
+#include <iostream>
 
 
-ConvolutionReverb::ConvolutionReverb(bool toggle, std::string path, double dryWet) : AudioProcessor(toggle), path(path), dryWet(Smoother(dryWet, dryWet, 0)) {
+ConvolutionReverb::ConvolutionReverb(bool toggle, std::string path, double dryWet, float deviceSampleRate)
+    : AudioProcessor(toggle), path(path), dryWet(Smoother(dryWet, dryWet, 0)), deviceSampleRate(deviceSampleRate) {
     chunkSize = convolutionChunkSize;
     paddedSize = chunkSize * 2;
-    impulseResponse = readIRFile(path);
+
+    IRData irData = readIRFile(path);
+    impulseResponse = std::move(irData.audioData);
+    irSampleRate = irData.sampleRate;
+    sampleRateMismatch = (irSampleRate != 0 && static_cast<uint32_t>(deviceSampleRate) != irSampleRate);
+
+    if (sampleRateMismatch) {
+        std::cerr << "IR sample rate (" << irSampleRate << ") does not match device sample rate (" << deviceSampleRate << "). Reverb will be disabled." << std::endl;
+    }
+
     impulseResponseFFTs.resize(ceil(static_cast<float>(impulseResponse.size() / chunkSize)));
     impulseResponse.resize(impulseResponseFFTs.size() * chunkSize, 0);
 
@@ -84,6 +95,10 @@ std::vector<float> ConvolutionReverb::ifft(std::vector<std::complex<float>> inpu
 
 
 void ConvolutionReverb::process(std::vector<float>& input) {
+    if (sampleRateMismatch) {
+        return;
+    }
+
     if (mix.currentValueNoChange() > 0 || mix.getRemaining() > 0) {
         size_t inputSize = input.size();
         size_t totalSize = (impulseResponseFFTs.size() + 1) * (chunkSize);
@@ -138,4 +153,8 @@ double ConvolutionReverb::getDryWet() {
 
 void ConvolutionReverb::setDryWet(double newDryWet) {
     dryWet = Smoother(dryWet.currentValueNoChange(), newDryWet, smootherSteps);
+}
+
+float ConvolutionReverb::getDeviceSampleRate() const {
+    return deviceSampleRate;
 }

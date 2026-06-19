@@ -16,12 +16,13 @@
 
 class Processing {
 public:
-    Processing(const Config& config, double volume);
-    Processing(const Config& config, const Processing* old, double volume);
+    Processing(const Config& config, double volume, float deviceSampleRate);
+    Processing(const Config& config, const Processing* old, double volume, float deviceSampleRate);
 
     void process(std::vector<float>& input);
 private:
     double volume;
+    float deviceSampleRate;
     Config config;
     std::shared_ptr<Amplifier> amplifier;
     std::shared_ptr<Equalizer> equalizer;

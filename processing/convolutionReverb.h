@@ -18,18 +18,22 @@ class ConvolutionReverb : public AudioProcessor {
 public:
     std::string path;
 
-    ConvolutionReverb(bool toggle, std::string path, double dryWet);
+    ConvolutionReverb(bool toggle, std::string path, double dryWet, float deviceSampleRate);
 
     std::vector<std::complex<float>> fft(const std::vector<float> input, FFTSetup fftSetup);
     std::vector<float> ifft(std::vector<std::complex<float>> input, FFTSetup fftSetup);
 
     double getDryWet();
     void setDryWet(double newDryWet);
+    float getDeviceSampleRate() const;
 
     void process(std::vector<float>& input);
 private:
     size_t chunkSize;
     size_t paddedSize;
+    float deviceSampleRate;
+    uint32_t irSampleRate;
+    bool sampleRateMismatch;
     Smoother dryWet;
     std::vector<FFTSetup> fftSetups;
     std::vector<float> overlap;
