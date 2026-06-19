@@ -22,6 +22,12 @@ const drywetBox = document.getElementById('drywetBox');
 
 const selectOutputDevice = document.getElementById('selectOutputDevice');
 
+const equalizerBody = document.getElementById('equalizerBody');
+const reverbBody = document.getElementById('reverbBody');
+
+const settingsToggle = document.getElementById('settingsToggle');
+const settingsBody = document.getElementById('settingsBody');
+
 // Presets
 let equalizerPresets = {};
 let reverbPresets = {};
@@ -30,9 +36,21 @@ const writeConfigToFile = function() {
     window.electronAPI.writeConfig(configJSON);
 };
 
+const fitWindowToContent = function() {
+    const body = document.body;
+    const width = body.scrollWidth;
+    const height = body.scrollHeight;
+    window.electronAPI.resizeWindow(width, height);
+};
+
 const renderConfig = function () {
     equalizerToggle.checked = configJSON['equalizer']['toggle'];
     reverbToggle.checked = configJSON['reverb']['toggle'];
+
+    equalizerBody.style.display = equalizerToggle.checked ? 'block' : 'none';
+    reverbBody.style.display = reverbToggle.checked ? 'block' : 'none';
+    settingsBody.style.display = settingsToggle.checked ? 'block' : 'none';
+
     preampSlider.value = configJSON['amplifier']['g']
     preampGainBox.value = configJSON['amplifier']['g'];
 
@@ -47,6 +65,8 @@ const renderConfig = function () {
     drywetBox.value = Math.round(configJSON['reverb']['dw'] * 100);
 
     selectReverbPreset.value = configJSON['reverb']['ir'].split('/').pop().split('.')[0]
+
+    fitWindowToContent();
 }
 
 const loadPresets = function () {
@@ -78,6 +98,7 @@ const loadOutputDevices = async function () {
         selectOutputDevice.appendChild(node);
     }
     selectOutputDevice.value = currentDevice;
+    fitWindowToContent();
 }
 
 selectOutputDevice.addEventListener('change', async function () {
@@ -123,6 +144,10 @@ equalizerToggle.oninput = function () {
 reverbToggle.oninput = function () {
     configJSON['reverb']['toggle'] = this.checked;
     writeConfigToFile();
+    renderConfig();
+}
+
+settingsToggle.oninput = function () {
     renderConfig();
 }
 

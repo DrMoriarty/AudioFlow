@@ -61,10 +61,19 @@ ipcMain.handle('setOutputDevice', async (event, name) => {
     return result.success || false;
 });
 
+ipcMain.handle('resizeWindow', async (event, width, height) => {
+    if (win && !win.isDestroyed()) {
+        win.setContentSize(width, height);
+        if (!win.isVisible()) {
+            win.show();
+        }
+    }
+});
+
 const createWindow = () => {
     win = new BrowserWindow({
         width: 600,
-        height: 816,
+        height: 100,
         backGroundColor: '#0F172A',
         show: false,
         resizable: false,
@@ -78,10 +87,6 @@ const createWindow = () => {
     });
 
     win.loadFile('src/index.html');
-
-    win.once('ready-to-show', () => {
-        win.show();
-    });
 }
 
 app.on('ready', () => {

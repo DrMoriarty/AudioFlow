@@ -49,4 +49,5 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getAvailableOutputDevices: () => ipcRenderer.invoke('getAvailableOutputDevices'),
     getCurrentOutputDeviceName: () => ipcRenderer.invoke('getCurrentOutputDeviceName'),
     setOutputDevice: (name) => ipcRenderer.invoke('setOutputDevice', name),
+    resizeWindow: (width, height) => ipcRenderer.invoke('resizeWindow', width, height),
 });
