@@ -121,6 +121,14 @@ IRData readIRFile(const std::string &path) {
             if (result.audioData.size() < convolutionChunkSize) {
                 result.audioData.resize(convolutionChunkSize, 0.0f);
             }
+
+            size_t numFrames = result.audioData.size() / 2;
+            result.audioDataL.reserve(numFrames);
+            result.audioDataR.reserve(numFrames);
+            for (size_t i = 0; i < numFrames; ++i) {
+                result.audioDataL.push_back(result.audioData[2 * i]);
+                result.audioDataR.push_back(result.audioData[2 * i + 1]);
+            }
         }
     }
 

@@ -9,7 +9,9 @@
 #include <cstdint>
 
 struct IRData {
-    std::vector<float> audioData;
+    std::vector<float> audioData;   // only used for backwards compat, can be removed later
+    std::vector<float> audioDataL;
+    std::vector<float> audioDataR;
     uint32_t sampleRate;
 };
 

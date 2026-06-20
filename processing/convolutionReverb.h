@@ -43,18 +43,29 @@ private:
         DSPSplitComplex dsp() { return { real.data(), imag.data() }; }
     };
 
-    std::vector<SplitComplex> impulseResponseFFTs;
-    std::vector<float> overlap;
+    std::vector<SplitComplex> irFFTsL;
+    std::vector<SplitComplex> irFFTsR;
+    std::vector<float> overlapL;
+    std::vector<float> overlapR;
 
     SplitComplex fftReal;
-    SplitComplex fftImag;
-    SplitComplex workerReal;
-    SplitComplex workerImag;
-    std::vector<float> iblitted;
-    std::vector<float> overlapReverb;
+
+    SplitComplex workerRealL;
+    SplitComplex workerRealR;
+    std::vector<float> iblittedL;
+    std::vector<float> iblittedR;
+    std::vector<float> overlapReverbL;
+    std::vector<float> overlapReverbR;
+
+    size_t numChunks;
 
     void fftZ(const std::vector<float>& input, float* outReal, float* outImag);
-    void ifftZ(float* real, float* imag);
+    void ifftZ(SplitComplex& workerReal, std::vector<float>& iblitted);
+
+    void convolveChannel(const std::vector<float>& input, std::vector<float>& output,
+                         const std::vector<SplitComplex>& irFFTs, std::vector<float>& overlap,
+                         SplitComplex& workerReal, std::vector<float>& iblitted,
+                         std::vector<float>& overlapReverb);
 };
 
 
