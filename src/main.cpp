@@ -1,4 +1,7 @@
 #include <algorithm>
+#include <queue>
+#include <functional>
+#include <future>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreAudio/CoreAudio.h>
 #include <iostream>
@@ -29,6 +32,10 @@ std::mutex audioProcessorMutex;
 Config config;
 
 std::atomic<bool> running{true};
+
+std::queue<std::function<void()>> mainThreadQueue;
+std::mutex mainThreadMutex;
+std::condition_variable mainThreadCV;
 
 std::map<UInt32 , std::string> getAudioDevices() {
     AudioObjectPropertyAddress propAddress;
@@ -395,6 +402,19 @@ bool setOutputDevice(const std::string& name) {
     return true;
 }
 
+template<typename F>
+auto dispatchToMainThread(F&& func) -> decltype(func()) {
+    using R = decltype(func());
+    auto task = std::make_shared<std::packaged_task<R()>>(std::forward<F>(func));
+    auto future = task->get_future();
+    {
+        std::lock_guard<std::mutex> lock(mainThreadMutex);
+        mainThreadQueue.push([task]() { (*task)(); });
+    }
+    mainThreadCV.notify_one();
+    return future.get();
+}
+
 void handleCommand(const std::string& line) {
     try {
         auto cmd = json::parse(line);
@@ -410,7 +430,9 @@ void handleCommand(const std::string& line) {
             std::cout << response.dump() << std::endl;
         } else if (action == "setOutputDevice") {
             std::string deviceName = cmd["name"];
-            bool success = setOutputDevice(deviceName);
+            bool success = dispatchToMainThread([deviceName]() {
+                return setOutputDevice(deviceName);
+            });
             json response = {{"success", success}};
             std::cout << response.dump() << std::endl;
         } else if (action == "setReverbToggle") {
@@ -621,7 +643,15 @@ int main() {
     cmdThread.detach();
 
     while (running) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::unique_lock<std::mutex> lock(mainThreadMutex);
+        mainThreadCV.wait_for(lock, std::chrono::milliseconds(100));
+        while (!mainThreadQueue.empty()) {
+            auto task = std::move(mainThreadQueue.front());
+            mainThreadQueue.pop();
+            lock.unlock();
+            task();
+            lock.lock();
+        }
     }
 }
 
