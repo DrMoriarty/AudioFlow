@@ -27,11 +27,12 @@ public:
 
     float getGain();
     void setGain(float newGain);
-private:
+
     Smoother frequency;
     Smoother quality;
     Smoother gain;
     Smoother sampleRate;
+
     std::vector<double> a_coeffs;
     std::vector<double> b_coeffs;
     std::vector<double> state;

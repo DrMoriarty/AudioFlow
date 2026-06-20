@@ -16,7 +16,7 @@ Equalizer::Equalizer(bool toggle, const std::vector<float> &fVector, const std::
     for (size_t i = 0; i < fVector.size(); i++) {
         filters->emplace_back(IIRFilter(fVector[i], qVector[i], gVector[i], sampleRate));
     }
-    std::reverse(filters->begin(), filters->end());
+
 }
 
 void Equalizer::process(std::vector<double>& input) {
@@ -25,20 +25,36 @@ void Equalizer::process(std::vector<double>& input) {
 
     if (currentMix <= 0 && mixRemaining <= 0) return;
 
-    processed = input;
+    size_t numFrames = input.size() / 2;
+
+    left.resize(numFrames);
+    right.resize(numFrames);
+    for (size_t i = 0; i < numFrames; ++i) {
+        left[i]  = input[2 * i];
+        right[i] = input[2 * i + 1];
+    }
+
     for (auto &filter: *filters) {
-        filter.process(processed);
+        filter.process(left);
+    }
+    for (auto &filter: *filters) {
+        std::vector<double> savedState = std::move(filter.state);
+        filter.state = std::vector<double>(filter.a_coeffs.size(), 0.0);
+        filter.process(right);
+        filter.state = std::move(savedState);
     }
 
     if (mixRemaining <= 0) {
         double dw = currentMix;
-        for (size_t i = 0; i < input.size(); ++i) {
-            input[i] = processed[i] * dw + input[i] * (1.0 - dw);
+        for (size_t i = 0; i < numFrames; ++i) {
+            input[2 * i]     = left[i]  * dw + input[2 * i]     * (1.0 - dw);
+            input[2 * i + 1] = right[i] * dw + input[2 * i + 1] * (1.0 - dw);
         }
     } else {
-        for (size_t i = 0; i < input.size(); ++i) {
+        for (size_t i = 0; i < numFrames; ++i) {
             double dw = mix.currentValue();
-            input[i] = processed[i] * dw + input[i] * (1.0 - dw);
+            input[2 * i]     = left[i]  * dw + input[2 * i]     * (1.0 - dw);
+            input[2 * i + 1] = right[i] * dw + input[2 * i + 1] * (1.0 - dw);
         }
     }
 }

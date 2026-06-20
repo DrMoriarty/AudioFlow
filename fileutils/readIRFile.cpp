@@ -88,7 +88,7 @@ IRData readIRFile(const std::string &path) {
                 for (size_t i = 0; i + 1 < dataSize; i += 2) {
                     int16_t sample;
                     std::memcpy(&sample, data + i, 2);
-                    result.audioData.push_back(sample / 32768.0f / 8.0f);
+                    result.audioData.push_back(sample / 32768.0f);
                 }
             } else if (bitsPerSample == 24) {
                 for (size_t i = 0; i + 2 < dataSize; i += 3) {
@@ -98,20 +98,20 @@ IRData readIRFile(const std::string &path) {
                     if (sample & 0x800000) {
                         sample |= 0xFF000000;
                     }
-                    result.audioData.push_back(sample / 8388608.0f / 8.0f);
+                    result.audioData.push_back(sample / 8388608.0f);
                 }
             } else if (bitsPerSample == 32) {
                 if (audioFormat == 3) {
                     for (size_t i = 0; i + 3 < dataSize; i += 4) {
                         float sample;
                         std::memcpy(&sample, data + i, 4);
-                        result.audioData.push_back(sample / 8.0f);
+                        result.audioData.push_back(sample);
                     }
                 } else {
                     for (size_t i = 0; i + 3 < dataSize; i += 4) {
                         int32_t sample;
                         std::memcpy(&sample, data + i, 4);
-                        result.audioData.push_back(sample / 2147483648.0f / 8.0f);
+                        result.audioData.push_back(sample / 2147483648.0f);
                     }
                 }
             } else {

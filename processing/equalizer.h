@@ -19,6 +19,8 @@ public:
 private:
     std::shared_ptr<std::vector<IIRFilter>> filters;
     std::vector<double> processed;
+    std::vector<double> left;
+    std::vector<double> right;
 };
 
 
