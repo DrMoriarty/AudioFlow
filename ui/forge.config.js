@@ -1,7 +1,18 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const { execSync } = require('child_process');
+const path = require('path');
 
 module.exports = {
+  hooks: {
+    postPackage: async (config, options) => {
+      const outputPath = options.outputPaths[0];
+      const appPath = path.join(outputPath, 'AudioFlow.app');
+      execSync(`codesign --deep --force --sign - --entitlements ${path.resolve(__dirname, 'entitlements.plist')} "${appPath}"`);
+      execSync(`codesign --force --sign - --entitlements ${path.resolve(__dirname, 'entitlements.child.plist')} "${path.join(appPath, 'Contents', 'Resources', 'build', 'AudioFlow')}"`);
+      console.log('[AudioFlow] Ad-hoc signed with audio entitlements');
+    }
+  },
   packagerConfig: {
       asar: true,
       icon: '../assets/icon/AudioFlow',
@@ -10,7 +21,12 @@ module.exports = {
 	  '../build',
 	  '../scripts',
 	  '../config.json'
-      ]
+      ],
+      extendInfo: {
+	  NSMicrophoneUsageDescription: 'AudioFlow needs microphone access to capture system audio via the BlackHole loopback driver for real-time equalization.'
+      },
+      osxSign: false,
+      osxNotarize: false
   },
   rebuildConfig: {},
   makers: [
