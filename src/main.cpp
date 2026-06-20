@@ -178,19 +178,22 @@ bool setAudioDeviceBufferSize(AudioDeviceID deviceID, UInt32 bufferSizeInFrames)
 }
 
 float getAudioDeviceVolume(UInt32 deviceID) {
-    OSStatus status;
-    float volume;
-
     AudioObjectPropertyAddress volumeAddress;
     volumeAddress.mSelector = kAudioDevicePropertyVolumeScalar;
     volumeAddress.mScope = kAudioDevicePropertyScopeOutput;
     volumeAddress.mElement = kAudioObjectPropertyElementMain;
 
+    if (!AudioObjectHasProperty(deviceID, &volumeAddress)) {
+        std::cerr << "Device " << deviceID << " does not have volume property" << std::endl;
+        return -1.0;
+    }
+
+    float volume;
     UInt32 dataSize = sizeof(float);
-    status = AudioObjectGetPropertyData(deviceID, &volumeAddress, 0, nullptr, &dataSize, &volume);
+    OSStatus status = AudioObjectGetPropertyData(deviceID, &volumeAddress, 0, nullptr, &dataSize, &volume);
     if (status != noErr) {
-        std::cerr << "Error getting volume for device: " << deviceID << std::endl;
-        return -1.0; // Return a negative value to indicate error
+        std::cerr << "Error getting volume for device: " << deviceID << " Status: " << status << std::endl;
+        return -1.0;
     }
 
     return volume;
@@ -198,16 +201,27 @@ float getAudioDeviceVolume(UInt32 deviceID) {
 
 bool setAudioDeviceVolume(UInt32 deviceID, float volume) {
     OSStatus status;
+    Boolean isSettable;
 
     AudioObjectPropertyAddress volumeAddress;
     volumeAddress.mSelector = kAudioDevicePropertyVolumeScalar;
     volumeAddress.mScope = kAudioDevicePropertyScopeOutput;
     volumeAddress.mElement = kAudioObjectPropertyElementMain;
 
-    status = AudioObjectSetPropertyData(deviceID, &volumeAddress, 0, nullptr, sizeof(float), &volume);
-    if (status != noErr) {
-        std::cerr << "Error setting volume for device: " << deviceID << std::endl;
-        return false;
+    if (AudioObjectHasProperty(deviceID, &volumeAddress)) {
+        isSettable = false;
+        AudioObjectIsPropertySettable(deviceID, &volumeAddress, &isSettable);
+        if (isSettable) {
+            status = AudioObjectSetPropertyData(deviceID, &volumeAddress, 0, nullptr, sizeof(float), &volume);
+            if (status != noErr) {
+                std::cerr << "Error setting volume for device: " << deviceID << " Status: " << status << std::endl;
+                return false;
+            }
+        } else {
+            std::cerr << "Device " << deviceID << " does not support volume control" << std::endl;
+        }
+    } else {
+        std::cerr << "Device " << deviceID << " does not have volume property" << std::endl;
     }
 
     UInt32 mute = floor(1 - volume);
@@ -216,10 +230,18 @@ bool setAudioDeviceVolume(UInt32 deviceID, float volume) {
     muteAddress.mScope = kAudioDevicePropertyScopeOutput;
     muteAddress.mElement = kAudioObjectPropertyElementMain;
 
-    status = AudioObjectSetPropertyData(deviceID, &muteAddress, 0, nullptr, sizeof(UInt32), &mute);
-    if (status != noErr) {
-        std::cerr << "Error unmuting device: " << deviceID << std::endl;
-        return false;
+    if (AudioObjectHasProperty(deviceID, &muteAddress)) {
+        isSettable = false;
+        AudioObjectIsPropertySettable(deviceID, &muteAddress, &isSettable);
+        if (isSettable) {
+            status = AudioObjectSetPropertyData(deviceID, &muteAddress, 0, nullptr, sizeof(UInt32), &mute);
+            if (status != noErr) {
+                std::cerr << "Error unmuting device: " << deviceID << " Status: " << status << std::endl;
+                return false;
+            }
+        } else {
+            std::cerr << "Device " << deviceID << " does not support mute control" << std::endl;
+        }
     }
 
     return true;
@@ -231,12 +253,17 @@ float getAudioDeviceSampleRate(AudioObjectID deviceID) {
     propAddress.mScope = kAudioObjectPropertyScopeGlobal;
     propAddress.mElement = kAudioObjectPropertyElementMain;
 
+    if (!AudioObjectHasProperty(deviceID, &propAddress)) {
+        std::cerr << "Device " << deviceID << " does not have sample rate property" << std::endl;
+        return -1.0;
+    }
+
     Float64 sampleRate = 0;
     UInt32 dataSize = sizeof(Float64);
     OSStatus status = AudioObjectGetPropertyData(deviceID, &propAddress, 0, nullptr, &dataSize, &sampleRate);
     if (status != noErr) {
-        std::cerr << "Error getting sample rate for device: " << deviceID << std::endl;
-        return 0;
+        std::cerr << "Error getting sample rate for device: " << deviceID << " Status: " << status << std::endl;
+        return -1.0;
     }
 
     return static_cast<float>(sampleRate);
@@ -346,7 +373,7 @@ bool setOutputDevice(const std::string& name) {
     }
 
     deviceSampleRate = getAudioDeviceSampleRate(defaultDeviceID);
-    if (deviceSampleRate == 0) {
+    if (deviceSampleRate <= 0) {
         std::cerr << "Failed to get device sample rate, defaulting to 48000" << std::endl;
         deviceSampleRate = 48000.0f;
     }
@@ -550,7 +577,11 @@ int main() {
 
     // Volume and device swaps
     float defaultDeviceVolume = getAudioDeviceVolume(defaultDeviceID);
-    setAudioDeviceVolume(driverID, defaultDeviceVolume);
+    if (defaultDeviceVolume > 0.0) {
+        setAudioDeviceVolume(driverID, defaultDeviceVolume);
+    } else {
+        setAudioDeviceVolume(driverID, 0.5);
+    }
     setDefaultOutputDevice(driverID);
     setDefaultSystemOutputDevice(driverID);
     setAudioDeviceVolume(defaultDeviceID, 1);
