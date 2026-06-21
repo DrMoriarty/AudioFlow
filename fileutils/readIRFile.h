@@ -13,6 +13,7 @@ struct IRData {
     std::vector<float> audioDataL;
     std::vector<float> audioDataR;
     uint32_t sampleRate;
+    uint16_t numChannels = 0;
 };
 
 IRData readIRFile(const std::string &path);

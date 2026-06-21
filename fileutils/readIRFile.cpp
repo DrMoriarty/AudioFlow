@@ -68,12 +68,13 @@ IRData readIRFile(const std::string &path) {
                 bool isFloat = (audioFormat == 3);
                 bool validBits = (bitsPerSample == 16 || bitsPerSample == 24 || bitsPerSample == 32);
 
-                if (numChannels != 2 || (!isPCM && !isFloat) || !validBits) {
-                    std::cerr << "Only stereo WAV files (16/24/32-bit PCM or 32-bit float) are supported." << std::endl;
+                if ((numChannels < 1 || numChannels > 2) || (!isPCM && !isFloat) || !validBits) {
+                    std::cerr << "Only mono/stereo WAV files (16/24/32-bit PCM or 32-bit float) are supported." << std::endl;
                     return result;
                 }
 
                 result.sampleRate = sampleRate;
+                result.numChannels = numChannels;
             } else {
                 std::cerr << "Unexpected fmt chunk size: " << chunk.chunkSize << std::endl;
                 return result;
@@ -122,12 +123,17 @@ IRData readIRFile(const std::string &path) {
                 result.audioData.resize(convolutionChunkSize, 0.0f);
             }
 
-            size_t numFrames = result.audioData.size() / 2;
-            result.audioDataL.reserve(numFrames);
-            result.audioDataR.reserve(numFrames);
-            for (size_t i = 0; i < numFrames; ++i) {
-                result.audioDataL.push_back(result.audioData[2 * i]);
-                result.audioDataR.push_back(result.audioData[2 * i + 1]);
+            if (numChannels == 2) {
+                size_t numFrames = result.audioData.size() / 2;
+                result.audioDataL.reserve(numFrames);
+                result.audioDataR.reserve(numFrames);
+                for (size_t i = 0; i < numFrames; ++i) {
+                    result.audioDataL.push_back(result.audioData[2 * i]);
+                    result.audioDataR.push_back(result.audioData[2 * i + 1]);
+                }
+            } else {
+                result.audioDataL = result.audioData;
+                result.audioDataR = result.audioData;
             }
 
             auto normalizeL2 = [](std::vector<float>& v) {
