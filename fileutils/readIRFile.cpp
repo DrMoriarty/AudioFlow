@@ -40,7 +40,7 @@ IRData readIRFile(const std::string &path) {
 
     std::vector<Chunk> chunks;
 
-    while (file.tellg() < header.chunkSize + 8) {
+    while ((file.tellg() < header.chunkSize + 8) && !file.eof() && !file.fail()) {
         Chunk chunk;
         file.read(reinterpret_cast<char*>(&chunk.chunkID), sizeof(chunk.chunkID));
         file.read(reinterpret_cast<char*>(&chunk.chunkSize), sizeof(chunk.chunkSize));
@@ -129,6 +129,18 @@ IRData readIRFile(const std::string &path) {
                 result.audioDataL.push_back(result.audioData[2 * i]);
                 result.audioDataR.push_back(result.audioData[2 * i + 1]);
             }
+
+            auto normalizeL2 = [](std::vector<float>& v) {
+                double sumSq = 0.0;
+                for (float s : v) sumSq += static_cast<double>(s) * s;
+                if (sumSq > 0.0) {
+                    float normFactor = static_cast<float>(1.0 / sqrt(sumSq));
+                    for (auto& s : v) s *= normFactor;
+                }
+            };
+            normalizeL2(result.audioDataL);
+            normalizeL2(result.audioDataR);
+
         }
     }
 
