@@ -151,16 +151,19 @@ const renderConfig = function () {
 
     preampSlider.value = configJSON['amplifier']['g'];
     preamplifierGainBox.value = configJSON['amplifier']['g'];
+    updatePreampSliderBg();
 
     for (let i = 0; i < sliderContainers.length; i++) {
         eqSliders[i].value = configJSON['equalizer']['g'][i];
         eqFBoxes[i].value = configJSON['equalizer']['f'][i];
         eqQBoxes[i].value = configJSON['equalizer']['q'][i];
         eqGainBoxes[i].value = configJSON['equalizer']['g'][i];
+        updateEqSliderBg(i);
     }
 
     drywetSlider.value = Math.round(configJSON['reverb']['dw'] * 100);
     drywetBox.value = Math.round(configJSON['reverb']['dw'] * 100);
+    updateDryWetSliderBg();
 
     const irName = configJSON['reverb']['ir'].split('/').pop().split('.')[0];
     const presetKeys = Object.keys(reverbPresets);
@@ -429,6 +432,36 @@ const init = () => {
     loadOutputDevices();
     renderConfig();
 };
+
+// Slider dynamic background color
+// t: 0 = blue (min), 0.5 = gray (neutral), 1 = red (max)
+function sliderBgColor(t) {
+    const blue = [46, 51, 111];
+    const gray = [50, 58, 70];
+    const red = [125, 18, 18];
+    const c = t <= 0.5
+        ? blue.map((b, i) => Math.round(b + (gray[i] - b) * (t * 2)))
+        : gray.map((g, i) => Math.round(g + (red[i] - g) * ((t - 0.5) * 2)));
+    return `rgb(${c[0]}, ${c[1]}, ${c[2]})`;
+}
+
+function updatePreampSliderBg() {
+    const val = parseFloat(preampSlider.value);
+    preampSlider.style.background = 'none';
+    preampSlider.style.backgroundColor = sliderBgColor((val + 30) / 60);
+}
+
+function updateEqSliderBg(index) {
+    const val = parseFloat(eqSliders[index].value);
+    eqSliders[index].style.background = 'none';
+    eqSliders[index].style.backgroundColor = sliderBgColor((val + 30) / 60);
+}
+
+function updateDryWetSliderBg() {
+    const val = parseFloat(drywetSlider.value);
+    drywetSlider.style.background = 'none';
+    drywetSlider.style.backgroundColor = sliderBgColor(val / 100);
+}
 
 window.addEventListener('resize', updateDryWetBoxPosition);
 window.addEventListener('resize', updatePreampGainBoxPosition);

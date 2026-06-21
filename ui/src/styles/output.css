@@ -986,9 +986,17 @@ video {
   appearance: none;
   width: 0.5rem;
   height: 1rem;
-  background: rgb(55 48 163);
+  background: rgb(15, 23, 42);
   cursor: pointer;
   border-radius: 4px;
+}
+
+#preampSlider::-webkit-slider-runnable-track {
+  background: transparent;
+  height: calc(100% - 4px);
+  margin: 2px 0;
+  border-radius: 4px;
+  border: none;
 }
 
 #drywetSlider {
@@ -1001,9 +1009,17 @@ video {
   appearance: none;
   width: 0.5rem;
   height: 1rem;
-  background: rgb(55 48 163);
+  background: rgb(15, 23, 42);
   cursor: pointer;
   border-radius: 4px;
+}
+
+#drywetSlider::-webkit-slider-runnable-track {
+  background: transparent;
+  height: calc(100% - 4px);
+  margin: 2px 0;
+  border-radius: 4px;
+  border: none;
 }
 
 .eqSliderContainer input[type="range"] {
@@ -1017,9 +1033,17 @@ video {
   appearance: none;
   width: 0.5rem;
   height: 1.25rem;
-  background: rgb(55 48 163);
+  background: rgb(15, 23, 42);
   cursor: pointer;
   border-radius: 4px;
+}
+
+.eqSliderContainer input[type="range"]::-webkit-slider-runnable-track {
+  background: transparent;
+  height: calc(100% - 4px);
+  margin: 2px 0;
+  border-radius: 4px;
+  border: none;
 }
 
 input::-webkit-outer-spin-button,
