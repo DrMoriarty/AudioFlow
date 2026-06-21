@@ -90,6 +90,11 @@ ipcMain.handle('setEqualizerToggle', async (event, toggle) => {
     return result.success || false;
 });
 
+ipcMain.handle('setAmplifierToggle', async (event, toggle) => {
+    const result = await sendCommand({ action: 'setAmplifierToggle', toggle });
+    return result.success || false;
+});
+
 ipcMain.handle('setAmplifierGain', async (event, gain) => {
     const result = await sendCommand({ action: 'setAmplifierGain', gain });
     return result.success || false;

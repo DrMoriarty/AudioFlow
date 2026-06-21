@@ -6,8 +6,12 @@ const autoPreampToggle = document.getElementById('autoPreampToggle');
 const equalizerToggle = document.getElementById('equalizerToggle');
 const reverbToggle = document.getElementById('reverbToggle');
 
+const preamplifierToggle = document.getElementById('preamplifierToggle');
+const preamplifierBody = document.getElementById('preamplifierBody');
+const preamplifierGainBox = document.getElementById('preamplifierGainBox');
+const preampGainBox = preamplifierGainBox;
+
 const preampSlider = document.getElementById('preampSlider');
-const preampGainBox = document.getElementById('preampGain');
 
 const selectEqualizerPreset = document.getElementById('selectEqualizerPreset')
 const sliderContainers = document.getElementsByClassName('eqSliderContainer');
@@ -43,6 +47,28 @@ function updateDryWetBoxPosition() {
     box.style.left = offsetLeft - box.offsetWidth / 2 + 'px';
 }
 
+function updatePreampGainBoxPosition() {
+    const slider = preampSlider;
+    const box = preamplifierGainBox;
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const val = parseFloat(slider.value);
+    const percent = (val - min) / (max - min);
+
+    const sliderRect = slider.getBoundingClientRect();
+    const containerRect = slider.parentElement.getBoundingClientRect();
+
+    const trackPadLeft = 6;
+    const trackPadRight = 6;
+    const thumbW = 8;
+
+    const trackWidth = sliderRect.width - trackPadLeft - trackPadRight - thumbW;
+    const px = trackPadLeft + percent * trackWidth + thumbW / 2;
+
+    const offsetLeft = sliderRect.left - containerRect.left + px;
+    box.style.left = offsetLeft - box.offsetWidth / 2 + 'px';
+}
+
 const selectOutputDevice = document.getElementById('selectOutputDevice');
 
 const equalizerBody = document.getElementById('equalizerBody');
@@ -59,23 +85,72 @@ const writeConfigToFile = function() {
     window.electronAPI.writeConfig(configJSON);
 };
 
+const bandLefts = [
+    94, 142, 190, 238, 286, 334, 382, 430, 478, 526
+];
+
+function updateSliderPositions() {
+    const hzLabel = document.getElementById('hzLabel');
+    const sliderLabelsDiv = document.getElementById('sliderLabels');
+    const gainLabel = document.getElementById('gainLabel');
+    const qLabel = document.getElementById('qLabel');
+    if (!hzLabel || !sliderLabelsDiv || !gainLabel || !qLabel) return;
+
+    const fBoxTop = Math.round(hzLabel.getBoundingClientRect().top);
+    const gainTop = Math.round(gainLabel.getBoundingClientRect().top);
+    const qTop = Math.round(qLabel.getBoundingClientRect().top);
+
+    const top30Top = Math.round(sliderLabelsDiv.children[0].getBoundingClientRect().top);
+    const sliderTop = top30Top + 108;
+
+    for (let i = 0; i < bandLefts.length; i++) {
+        const f = document.getElementById('fBox' + i);
+        const s = document.getElementById('eqSlider' + i);
+        const g = document.getElementById('gainBox' + i);
+        const q = document.getElementById('qBox' + i);
+        if (!f || !s || !g || !q) continue;
+
+        f.style.top = fBoxTop + 'px';
+        s.style.top = sliderTop + 'px';
+        g.style.top = gainTop + 'px';
+        q.style.top = qTop + 'px';
+
+        const lx = bandLefts[i] + 'px';
+        const slx = (bandLefts[i] - 92) + 'px';
+        f.style.left = lx;
+        g.style.left = lx;
+        q.style.left = lx;
+        s.style.left = slx;
+    }
+}
+
 const fitWindowToContent = function() {
     const body = document.body;
     const width = body.scrollWidth;
-    const height = body.scrollHeight;
+    let height = body.scrollHeight;
+    for (let i = 0; i < 10; i++) {
+        const el = document.getElementById('qBox' + i) || document.getElementById('eqSlider' + i);
+        if (el) {
+            const r = el.getBoundingClientRect();
+            const bottom = Math.round(r.top + r.height);
+            if (bottom > height) height = bottom;
+        }
+    }
     window.electronAPI.resizeWindow(width, height);
 };
 
 const renderConfig = function () {
     equalizerToggle.checked = configJSON['equalizer']['toggle'];
     reverbToggle.checked = configJSON['reverb']['toggle'];
+    preamplifierToggle.checked = configJSON['amplifier']['toggle'];
 
     equalizerBody.style.display = equalizerToggle.checked ? 'block' : 'none';
     reverbBody.style.display = reverbToggle.checked ? 'block' : 'none';
+    preamplifierBody.style.display = preamplifierToggle.checked ? 'block' : 'none';
     settingsBody.style.display = settingsToggle.checked ? 'block' : 'none';
 
-    preampSlider.value = configJSON['amplifier']['g']
-    preampGainBox.value = configJSON['amplifier']['g'];
+    preampSlider.value = configJSON['amplifier']['g'];
+    preamplifierGainBox.value = configJSON['amplifier']['g'];
 
     for (let i = 0; i < sliderContainers.length; i++) {
         eqSliders[i].value = configJSON['equalizer']['g'][i];
@@ -106,8 +181,10 @@ const renderConfig = function () {
         selectReverbPreset.value = customName;
     }
 
+    updateSliderPositions();
     fitWindowToContent();
     requestAnimationFrame(updateDryWetBoxPosition);
+    requestAnimationFrame(updatePreampGainBoxPosition);
 }
 
 const loadPresets = function () {
@@ -188,12 +265,19 @@ autoPreampToggle.oninput = function () {
         const preamp = -Math.max(0, ...configJSON['equalizer']['g']);
         configJSON['amplifier']['g'] = preamp;
         writeConfigToFile();
+        window.electronAPI.setAmplifierGain(preamp);
     }
     renderConfig();
 }
 
-equalizerToggle.oninput = async function () {
+preamplifierToggle.oninput = async function () {
     configJSON['amplifier']['toggle'] = this.checked;
+    writeConfigToFile();
+    await window.electronAPI.setAmplifierToggle(this.checked);
+    renderConfig();
+}
+
+equalizerToggle.oninput = async function () {
     configJSON['equalizer']['toggle'] = this.checked;
     writeConfigToFile();
     await window.electronAPI.setEqualizerToggle(this.checked);
@@ -219,6 +303,7 @@ preampSlider.oninput = async function () {
     writeConfigToFile();
     await window.electronAPI.setAmplifierGain(value);
     renderConfig();
+    requestAnimationFrame(updatePreampGainBoxPosition);
 };
 
 preampGainBox.onkeydown = async function(e) {
@@ -232,6 +317,7 @@ preampGainBox.onkeydown = async function(e) {
             await window.electronAPI.setAmplifierGain(value);
         }
         renderConfig();
+        requestAnimationFrame(updatePreampGainBoxPosition);
     }
 }
 
@@ -260,6 +346,7 @@ for (let i = 0; i < sliderContainers.length; i++) {
         writeConfigToFile();
         await window.electronAPI.setEqualizerBand(i, configJSON['equalizer']['f'][i], configJSON['equalizer']['q'][i], configJSON['equalizer']['g'][i]);
         renderConfig();
+        requestAnimationFrame(updatePreampGainBoxPosition);
     }
 
     fBox.onkeydown = async function(e) {
@@ -310,8 +397,9 @@ for (let i = 0; i < sliderContainers.length; i++) {
                 await window.electronAPI.setEqualizerBand(i, configJSON['equalizer']['f'][i], configJSON['equalizer']['q'][i], configJSON['equalizer']['g'][i]);
             }
             renderConfig()
+            requestAnimationFrame(updatePreampGainBoxPosition);
         }
-    }
+    };
 };
 
 // Set event listeners for reverb unit
@@ -340,9 +428,9 @@ const init = () => {
     loadPresets();
     loadOutputDevices();
     renderConfig();
-    requestAnimationFrame(updateDryWetBoxPosition);
 };
 
 window.addEventListener('resize', updateDryWetBoxPosition);
+window.addEventListener('resize', updatePreampGainBoxPosition);
 
 init();

@@ -54,6 +54,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setReverbIRFile: (path) => ipcRenderer.invoke('setReverbIRFile', path),
     showOpenFileDialog: () => ipcRenderer.invoke('showOpenFileDialog'),
     setEqualizerToggle: (toggle) => ipcRenderer.invoke('setEqualizerToggle', toggle),
+    setAmplifierToggle: (toggle) => ipcRenderer.invoke('setAmplifierToggle', toggle),
     setAmplifierGain: (gain) => ipcRenderer.invoke('setAmplifierGain', gain),
     setEqualizerBand: (index, f, q, g) => ipcRenderer.invoke('setEqualizerBand', index, f, q, g),
     resizeWindow: (width, height) => ipcRenderer.invoke('resizeWindow', width, height),

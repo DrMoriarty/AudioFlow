@@ -460,6 +460,12 @@ void handleCommand(const std::string& line) {
             bool toggle = cmd["toggle"];
             audioProcessorMutex.lock();
             audioProcessor->setEqualizerToggle(toggle);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setAmplifierToggle") {
+            bool toggle = cmd["toggle"];
+            audioProcessorMutex.lock();
             audioProcessor->setAmplifierToggle(toggle);
             audioProcessorMutex.unlock();
             json response = {{"success", true}};
