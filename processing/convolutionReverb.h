@@ -31,8 +31,6 @@ private:
     size_t paddedSize;
     size_t numBins;
     float deviceSampleRate;
-    uint32_t irSampleRate;
-    bool sampleRateMismatch;
     Smoother dryWet;
 
     FFTSetup fftSetup;

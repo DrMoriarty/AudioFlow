@@ -16,6 +16,8 @@ struct IRData {
     uint16_t numChannels = 0;
 };
 
-IRData readIRFile(const std::string &path);
+void resampleIR(std::vector<float> &buffer, double srcRate, double dstRate);
+
+IRData readIRFile(const std::string &path, uint32_t deviceSampleRate = 0);
 
 #endif //EQ_CPP_READIRFILE_H

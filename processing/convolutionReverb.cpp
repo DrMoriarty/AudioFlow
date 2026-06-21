@@ -13,14 +13,7 @@ ConvolutionReverb::ConvolutionReverb(bool toggle, std::string path, double dryWe
     numBins = paddedSize / 2;
     numChunks = 0;
 
-    IRData irData = readIRFile(path);
-    irSampleRate = irData.sampleRate;
-    sampleRateMismatch = (irSampleRate != 0 && static_cast<uint32_t>(deviceSampleRate) != irSampleRate);
-
-    if (sampleRateMismatch) {
-        std::cerr << "IR sample rate (" << irSampleRate << ") does not match device sample rate ("
-                  << deviceSampleRate << "). Reverb will be disabled." << std::endl;
-    }
+    IRData irData = readIRFile(path, static_cast<uint32_t>(deviceSampleRate));
 
     fftSetup = vDSP_create_fftsetup(static_cast<vDSP_Length>(std::log2(paddedSize)), FFT_RADIX2);
 
@@ -135,10 +128,6 @@ void ConvolutionReverb::convolveChannel(const std::vector<float>& input, std::ve
 }
 
 void ConvolutionReverb::process(std::vector<float>& input) {
-    if (sampleRateMismatch) {
-        return;
-    }
-
     if (mix.currentValueNoChange() <= 0 && mix.getRemaining() <= 0) {
         return;
     }

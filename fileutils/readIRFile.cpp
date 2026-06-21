@@ -6,8 +6,30 @@
 #include <fstream>
 #include <vector>
 #include <cstring>
+#include <cmath>
 #include "readIRFile.h"
 #include "../fileutils/globals.h"
+
+void resampleIR(std::vector<float> &buffer, double srcRate, double dstRate) {
+    if (srcRate == dstRate || buffer.empty() || srcRate <= 0.0 || dstRate <= 0.0) return;
+
+    double ratio = dstRate / srcRate;
+    size_t outLen = static_cast<size_t>(std::round(buffer.size() * ratio));
+    std::vector<float> out(outLen, 0.0f);
+
+    for (size_t i = 0; i < outLen; ++i) {
+        double srcPos = static_cast<double>(i) / ratio;
+        size_t idx0 = static_cast<size_t>(srcPos);
+        double frac = srcPos - static_cast<double>(idx0);
+        if (idx0 + 1 < buffer.size()) {
+            out[i] = static_cast<float>(buffer[idx0] * (1.0 - frac) + buffer[idx0 + 1] * frac);
+        } else if (idx0 < buffer.size()) {
+            out[i] = buffer[idx0];
+        }
+    }
+
+    buffer = std::move(out);
+}
 
 struct WAVHeader {
     char chunkID[4];
@@ -21,7 +43,7 @@ struct Chunk {
     std::vector<char> data;
 };
 
-IRData readIRFile(const std::string &path) {
+IRData readIRFile(const std::string &path, uint32_t deviceSampleRate) {
     IRData result;
     result.sampleRate = 0;
 
@@ -119,21 +141,34 @@ IRData readIRFile(const std::string &path) {
                 std::cerr << "Unsupported bits per sample: " << bitsPerSample << std::endl;
             }
 
-            if (result.audioData.size() < convolutionChunkSize) {
-                result.audioData.resize(convolutionChunkSize, 0.0f);
+            auto deinterleave = [&](std::vector<float>& L, std::vector<float>& R) {
+                if (numChannels == 2) {
+                    size_t numFrames = result.audioData.size() / 2;
+                    L.reserve(numFrames);
+                    R.reserve(numFrames);
+                    for (size_t i = 0; i < numFrames; ++i) {
+                        L.push_back(result.audioData[2 * i]);
+                        R.push_back(result.audioData[2 * i + 1]);
+                    }
+                } else {
+                    L = result.audioData;
+                    R = result.audioData;
+                }
+            };
+
+            deinterleave(result.audioDataL, result.audioDataR);
+
+            if (deviceSampleRate > 0 && result.sampleRate > 0 &&
+                deviceSampleRate != result.sampleRate) {
+                resampleIR(result.audioDataL, static_cast<double>(result.sampleRate),
+                           static_cast<double>(deviceSampleRate));
+                resampleIR(result.audioDataR, static_cast<double>(result.sampleRate),
+                           static_cast<double>(deviceSampleRate));
             }
 
-            if (numChannels == 2) {
-                size_t numFrames = result.audioData.size() / 2;
-                result.audioDataL.reserve(numFrames);
-                result.audioDataR.reserve(numFrames);
-                for (size_t i = 0; i < numFrames; ++i) {
-                    result.audioDataL.push_back(result.audioData[2 * i]);
-                    result.audioDataR.push_back(result.audioData[2 * i + 1]);
-                }
-            } else {
-                result.audioDataL = result.audioData;
-                result.audioDataR = result.audioData;
+            if (result.audioDataL.size() < convolutionChunkSize) {
+                result.audioDataL.resize(convolutionChunkSize, 0.0f);
+                result.audioDataR.resize(convolutionChunkSize, 0.0f);
             }
 
             auto normalizeL2 = [](std::vector<float>& v) {
