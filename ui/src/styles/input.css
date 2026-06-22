@@ -33,6 +33,20 @@
     border-radius: 4px;
 }
 
+#correctionDWSlider {
+    -webkit-appearance: none;
+    cursor: pointer;
+}
+
+#correctionDWSlider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 0.5rem;
+    height: 1rem;
+    background: rgb(55 48 163);
+    cursor: pointer;
+    border-radius: 4px;
+}
 
 .eqSliderContainer input[type="range"] {
     -webkit-appearance: none;

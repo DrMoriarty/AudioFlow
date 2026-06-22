@@ -105,6 +105,21 @@ ipcMain.handle('setReverbIRFile', async (event, path) => {
     return result.success || false;
 });
 
+ipcMain.handle('setCorrectionToggle', async (event, toggle) => {
+    const result = await sendCommand({ action: 'setCorrectionToggle', toggle });
+    return result.success || false;
+});
+
+ipcMain.handle('setCorrectionIRFile', async (event, path) => {
+    const result = await sendCommand({ action: 'setCorrectionIRFile', path });
+    return result.success || false;
+});
+
+ipcMain.handle('setCorrectionDryWet', async (event, dryWet) => {
+    const result = await sendCommand({ action: 'setCorrectionDryWet', dryWet });
+    return result.success || false;
+});
+
 ipcMain.handle('setEqualizerToggle', async (event, toggle) => {
     const result = await sendCommand({ action: 'setEqualizerToggle', toggle });
     return result.success || false;

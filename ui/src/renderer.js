@@ -9,13 +9,15 @@ const defaults = {
         q: [1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41, 1.41],
         g: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     },
-    reverb: { toggle: false, dw: 0, ir: '' }
+    reverb: { toggle: false, dw: 0, ir: '' },
+    correction: { toggle: false, dw: 1.0, ir: '', recent: [] }
 };
 
 // DOM Elements
 const autoPreampToggle = document.getElementById('autoPreampToggle');
 const equalizerToggle = document.getElementById('equalizerToggle');
 const reverbToggle = document.getElementById('reverbToggle');
+const correctingToggle = document.getElementById('correctingToggle');
 
 const preamplifierToggle = document.getElementById('preamplifierToggle');
 const preamplifierBody = document.getElementById('preamplifierBody');
@@ -35,6 +37,12 @@ const selectReverbPreset = document.getElementById('selectReverbPreset')
 const customIRButton = document.getElementById('customIRButton');
 const drywetSlider = document.getElementById('drywetSlider');
 const drywetBox = document.getElementById('drywetBox');
+
+const correctingBody = document.getElementById('correctingBody');
+const selectCorrectionIR = document.getElementById('selectCorrectionIR');
+const correctionIRButton = document.getElementById('correctionIRButton');
+const correctionDWSlider = document.getElementById('correctionDWSlider');
+const correctionDWBox = document.getElementById('correctionDWBox');
 
 function updateDryWetBoxPosition() {
     const slider = drywetSlider;
@@ -61,6 +69,28 @@ function updateDryWetBoxPosition() {
 function updatePreampGainBoxPosition() {
     const slider = preampSlider;
     const box = preamplifierGainBox;
+    const min = parseFloat(slider.min);
+    const max = parseFloat(slider.max);
+    const val = parseFloat(slider.value);
+    const percent = (val - min) / (max - min);
+
+    const sliderRect = slider.getBoundingClientRect();
+    const containerRect = slider.parentElement.getBoundingClientRect();
+
+    const trackPadLeft = 6;
+    const trackPadRight = 6;
+    const thumbW = 8;
+
+    const trackWidth = sliderRect.width - trackPadLeft - trackPadRight - thumbW;
+    const px = trackPadLeft + percent * trackWidth + thumbW / 2;
+
+    const offsetLeft = sliderRect.left - containerRect.left + px;
+    box.style.left = offsetLeft - box.offsetWidth / 2 + 'px';
+}
+
+function updateCorrectionDWBoxPosition() {
+    const slider = correctionDWSlider;
+    const box = correctionDWBox;
     const min = parseFloat(slider.min);
     const max = parseFloat(slider.max);
     const val = parseFloat(slider.value);
@@ -154,10 +184,12 @@ const renderConfig = function () {
     equalizerToggle.checked = configJSON['equalizer']['toggle'];
     reverbToggle.checked = configJSON['reverb']['toggle'];
     preamplifierToggle.checked = configJSON['amplifier']['toggle'];
+    correctingToggle.checked = configJSON['correction']['toggle'];
 
     equalizerBody.style.display = equalizerToggle.checked ? 'block' : 'none';
     reverbBody.style.display = reverbToggle.checked ? 'block' : 'none';
     preamplifierBody.style.display = preamplifierToggle.checked ? 'block' : 'none';
+    correctingBody.style.display = correctingToggle.checked ? 'block' : 'none';
     settingsBody.style.display = settingsToggle.checked ? 'block' : 'none';
 
     preampSlider.value = configJSON['amplifier']['g'];
@@ -175,6 +207,11 @@ const renderConfig = function () {
     drywetSlider.value = Math.round(configJSON['reverb']['dw'] * 100);
     drywetBox.value = Math.round(configJSON['reverb']['dw'] * 100);
     updateDryWetSliderBg();
+
+    const correctionDW = configJSON['correction']['dw'] !== undefined ? configJSON['correction']['dw'] : 1.0;
+    correctionDWSlider.value = Math.round(correctionDW * 100);
+    correctionDWBox.value = Math.round(correctionDW * 100);
+    updateCorrectionDWSliderBg();
 
     const irName = configJSON['reverb']['ir'].split('/').pop().split('.')[0];
     const presetKeys = Object.keys(reverbPresets);
@@ -195,10 +232,25 @@ const renderConfig = function () {
         selectReverbPreset.value = customName;
     }
 
+    // Correction IR dropdown
+    selectCorrectionIR.innerHTML = '';
+    const correctionRecent = configJSON['correction']['recent'] || [];
+    for (const filePath of correctionRecent) {
+        const fileName = filePath.split('/').pop();
+        const opt = document.createElement('option');
+        opt.value = filePath;
+        opt.textContent = fileName;
+        selectCorrectionIR.appendChild(opt);
+    }
+    if (configJSON['correction']['ir']) {
+        selectCorrectionIR.value = configJSON['correction']['ir'];
+    }
+
     updateSliderPositions();
     fitWindowToContent();
     requestAnimationFrame(updateDryWetBoxPosition);
     requestAnimationFrame(updatePreampGainBoxPosition);
+    requestAnimationFrame(updateCorrectionDWBoxPosition);
 }
 
 const loadPresets = function () {
@@ -273,6 +325,31 @@ customIRButton.addEventListener('click', async function () {
     }
 })
 
+selectCorrectionIR.addEventListener('change', async function () {
+    const filePath = selectCorrectionIR.value;
+    if (filePath) {
+        configJSON['correction']['ir'] = filePath;
+        writeConfigToFile();
+        await window.electronAPI.setCorrectionIRFile(filePath);
+    }
+})
+
+correctionIRButton.addEventListener('click', async function () {
+    const filePath = await window.electronAPI.showOpenFileDialog();
+    if (filePath) {
+        configJSON['correction']['ir'] = filePath;
+        if (!configJSON['correction']['recent']) configJSON['correction']['recent'] = [];
+        configJSON['correction']['recent'] = configJSON['correction']['recent'].filter(f => f !== filePath);
+        configJSON['correction']['recent'].unshift(filePath);
+        if (configJSON['correction']['recent'].length > 5) {
+            configJSON['correction']['recent'] = configJSON['correction']['recent'].slice(0, 5);
+        }
+        writeConfigToFile();
+        await window.electronAPI.setCorrectionIRFile(filePath);
+        renderConfig();
+    }
+})
+
 // Set event listeners for toggles
 autoPreampToggle.oninput = function () {
     if (autoPreampToggle.checked) {
@@ -302,6 +379,13 @@ reverbToggle.oninput = async function () {
     configJSON['reverb']['toggle'] = this.checked;
     writeConfigToFile();
     await window.electronAPI.setReverbToggle(this.checked);
+    renderConfig();
+}
+
+correctingToggle.oninput = async function () {
+    configJSON['correction']['toggle'] = this.checked;
+    writeConfigToFile();
+    await window.electronAPI.setCorrectionToggle(this.checked);
     renderConfig();
 }
 
@@ -438,9 +522,37 @@ drywetBox.onkeydown = async function(e) {
     }
 }
 
+// Set event listeners for correcting dry/wet
+correctionDWSlider.oninput = async function () {
+    const value = parseFloat(this.value) / 100;
+    configJSON['correction']['dw'] = value;
+    writeConfigToFile();
+    await window.electronAPI.setCorrectionDryWet(value);
+    renderConfig();
+};
+
+correctionDWBox.onkeydown = async function(e) {
+    if (e.keyCode == 13) {
+        correctionDWBox.blur();
+        if (!(isNaN(parseFloat(this.value)) || this.value < 0 || this.value > 100)) {
+            const value = parseFloat(this.value) / 100;
+            configJSON['correction']['dw'] = value;
+            writeConfigToFile();
+            await window.electronAPI.setCorrectionDryWet(value);
+        }
+        renderConfig();
+    }
+}
+
 const init = async () => {
     configJSON = await window.electronAPI.readConfig();
     if (!configJSON) configJSON = structuredClone(defaults);
+    if (!configJSON['correction']) {
+        configJSON['correction'] = structuredClone(defaults.correction);
+    }
+    if (configJSON['correction']['dw'] === undefined) {
+        configJSON['correction']['dw'] = 1.0;
+    }
     loadPresets();
     await loadOutputDevices();
     renderConfig();
@@ -476,7 +588,14 @@ function updateDryWetSliderBg() {
     drywetSlider.style.backgroundColor = sliderBgColor(val / 100);
 }
 
+function updateCorrectionDWSliderBg() {
+    const val = parseFloat(correctionDWSlider.value);
+    correctionDWSlider.style.background = 'none';
+    correctionDWSlider.style.backgroundColor = sliderBgColor(val / 100);
+}
+
 window.addEventListener('resize', updateDryWetBoxPosition);
 window.addEventListener('resize', updatePreampGainBoxPosition);
+window.addEventListener('resize', updateCorrectionDWBoxPosition);
 
 init();

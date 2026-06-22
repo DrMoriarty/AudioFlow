@@ -20,6 +20,9 @@ Config::Config(const std::string& configPath) : configFilePath(configPath) {
     reverbDryWet = 0.0f;
     irFilePath = "";
 
+    correctionToggle = false;
+    correctionIRFilePath = "";
+
     loadConfig();
 }
 
@@ -45,7 +48,11 @@ bool Config::loadConfig() {
     float reverbDryWet = data.at("reverb").at("dw").get<float>();
     std::string irFilePath = data.at("reverb").at("ir").get<std::string>();
 
-    if (ampToggle != this->ampToggle || ampGain != this->ampGain || equalizerToggle != this->equalizerToggle || equalizerF != this->equalizerF || equalizerQ != this->equalizerQ || equalizerG != this->equalizerG || reverbToggle != this->reverbToggle || reverbDryWet != this->reverbDryWet || irFilePath != this->irFilePath) {
+    bool correctionToggle = data.contains("correction") && data["correction"].contains("toggle") ? data["correction"]["toggle"].get<bool>() : false;
+    float correctionDryWet = data.contains("correction") && data["correction"].contains("dw") ? data["correction"]["dw"].get<float>() : 1.0f;
+    std::string correctionIRFilePath = data.contains("correction") && data["correction"].contains("ir") ? data["correction"]["ir"].get<std::string>() : "";
+
+    if (ampToggle != this->ampToggle || ampGain != this->ampGain || equalizerToggle != this->equalizerToggle || equalizerF != this->equalizerF || equalizerQ != this->equalizerQ || equalizerG != this->equalizerG || reverbToggle != this->reverbToggle || reverbDryWet != this->reverbDryWet || irFilePath != this->irFilePath || correctionToggle != this->correctionToggle || correctionDryWet != this->correctionDryWet || correctionIRFilePath != this->correctionIRFilePath) {
         this->ampToggle = ampToggle;
         this->ampGain = ampGain;
 
@@ -57,6 +64,10 @@ bool Config::loadConfig() {
         this->reverbToggle = reverbToggle;
         this->reverbDryWet = reverbDryWet;
         this->irFilePath = irFilePath;
+
+        this->correctionToggle = correctionToggle;
+        this->correctionDryWet = correctionDryWet;
+        this->correctionIRFilePath = correctionIRFilePath;
 
         return false;
     }

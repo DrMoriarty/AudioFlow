@@ -457,6 +457,27 @@ void handleCommand(const std::string& line) {
             audioProcessorMutex.unlock();
             json response = {{"success", true}};
             std::cout << response.dump() << std::endl;
+        } else if (action == "setCorrectionToggle") {
+            bool toggle = cmd["toggle"];
+            audioProcessorMutex.lock();
+            audioProcessor->setCorrectionToggle(toggle);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setCorrectionIRFile") {
+            std::string path = cmd["path"];
+            audioProcessorMutex.lock();
+            audioProcessor->setCorrectionIRFile(path);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
+        } else if (action == "setCorrectionDryWet") {
+            double dryWet = cmd["dryWet"];
+            audioProcessorMutex.lock();
+            audioProcessor->setCorrectionDryWet(dryWet);
+            audioProcessorMutex.unlock();
+            json response = {{"success", true}};
+            std::cout << response.dump() << std::endl;
         } else if (action == "setEqualizerToggle") {
             bool toggle = cmd["toggle"];
             audioProcessorMutex.lock();
@@ -599,7 +620,7 @@ int main(int argc, char* argv[]) {
     if (defaultDeviceVolume > 0.0) {
         setAudioDeviceVolume(driverID, defaultDeviceVolume);
     } else {
-        setAudioDeviceVolume(driverID, 0.5);
+        setAudioDeviceVolume(driverID, 1.0);
     }
     setDefaultOutputDevice(driverID);
     setDefaultSystemOutputDevice(driverID);

@@ -13,6 +13,7 @@ Processing::Processing(const Config& config, double volume, float deviceSampleRa
     deviceSampleRate(deviceSampleRate),
     amplifier(std::make_shared<Amplifier>(config.ampToggle, config.ampGain)),
     equalizer(std::make_shared<Equalizer>(config.equalizerToggle, config.equalizerF, config.equalizerQ, config.equalizerG, deviceSampleRate)),
+    correctionConvolver(std::make_shared<ConvolutionReverb>(config.correctionToggle, config.correctionIRFilePath, config.correctionDryWet, deviceSampleRate)),
     convolutionReverb(std::make_shared<ConvolutionReverb>(config.reverbToggle, config.irFilePath, config.reverbDryWet, deviceSampleRate)),
     volume(volume) {}
 
@@ -21,6 +22,7 @@ Processing::Processing(const Config& config, const Processing* old, double volum
         deviceSampleRate(deviceSampleRate),
         amplifier(std::move(old->amplifier)),
         equalizer(std::move(old->equalizer)),
+        correctionConvolver(std::move(old->correctionConvolver)),
         convolutionReverb(std::move(old->convolutionReverb)),
         volume(volume)
 {
@@ -64,9 +66,29 @@ Processing::Processing(const Config& config, const Processing* old, double volum
             convolutionReverb = std::move(newConvolutionReverb);
         }).detach();
     }
+
+    if (correctionConvolver->getToggle() != config.correctionToggle) {
+        correctionConvolver->setToggle(config.correctionToggle);
+    }
+    if (correctionConvolver->getDryWet() != config.correctionDryWet) {
+        correctionConvolver->setDryWet(config.correctionDryWet);
+    } else if (correctionConvolver->path != config.correctionIRFilePath || correctionConvolver->getDeviceSampleRate() != deviceSampleRate) {
+        std::thread ([this, config, deviceSampleRate]() {
+            correctionConvolver->setToggle(false);
+            auto newCorrectionConvolver = std::make_shared<ConvolutionReverb>(config.correctionToggle, config.correctionIRFilePath, config.correctionDryWet, deviceSampleRate);
+
+            std::lock_guard<std::mutex> lock(swapMutex);
+            correctionConvolver = std::move(newCorrectionConvolver);
+        }).detach();
+    }
 }
 
 void Processing::process(std::vector<float>& input) {
+    {
+        std::lock_guard<std::mutex> lock(swapMutex);
+        correctionConvolver->process(input);
+    }
+
     std::vector<double> doubleInput(input.begin(), input.end());
 
     amplifier->process(doubleInput);
@@ -93,6 +115,22 @@ void Processing::setReverbIRFile(const std::string& path) {
     std::lock_guard<std::mutex> lock(swapMutex);
     auto newConvolutionReverb = std::make_shared<ConvolutionReverb>(convolutionReverb->getToggle(), path, convolutionReverb->getDryWet(), deviceSampleRate);
     convolutionReverb = std::move(newConvolutionReverb);
+}
+
+void Processing::setCorrectionToggle(bool toggle) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    correctionConvolver->setToggle(toggle);
+}
+
+void Processing::setCorrectionDryWet(double dryWet) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    correctionConvolver->setDryWet(dryWet);
+}
+
+void Processing::setCorrectionIRFile(const std::string& path) {
+    std::lock_guard<std::mutex> lock(swapMutex);
+    auto newCorrectionConvolver = std::make_shared<ConvolutionReverb>(correctionConvolver->getToggle(), path, correctionConvolver->getDryWet(), deviceSampleRate);
+    correctionConvolver = std::move(newCorrectionConvolver);
 }
 
 void Processing::setEqualizerToggle(bool toggle) {

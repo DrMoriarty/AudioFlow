@@ -27,6 +27,10 @@ public:
     bool reverbToggle;
     float reverbDryWet;
     std::string irFilePath;
+
+    bool correctionToggle;
+    float correctionDryWet;
+    std::string correctionIRFilePath;
 };
 
 

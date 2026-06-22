@@ -25,6 +25,10 @@ public:
     void setReverbDryWet(double dryWet);
     void setReverbIRFile(const std::string& path);
 
+    void setCorrectionToggle(bool toggle);
+    void setCorrectionDryWet(double dryWet);
+    void setCorrectionIRFile(const std::string& path);
+
     void setEqualizerToggle(bool toggle);
     void setAmplifierToggle(bool toggle);
     void setAmplifierGain(float gain);
@@ -35,6 +39,7 @@ private:
     Config config;
     std::shared_ptr<Amplifier> amplifier;
     std::shared_ptr<Equalizer> equalizer;
+    std::shared_ptr<ConvolutionReverb> correctionConvolver;
     std::shared_ptr<ConvolutionReverb> convolutionReverb;
     std::mutex swapMutex;
 };
