@@ -2,6 +2,7 @@
 #include <queue>
 #include <functional>
 #include <future>
+#include <unistd.h>
 #include <CoreFoundation/CoreFoundation.h>
 #include <CoreAudio/CoreAudio.h>
 #include <iostream>
@@ -508,18 +509,6 @@ void commandLoop() {
 
 void cleanup(int signum) {
     running = false;
-    float driverVolume = getAudioDeviceVolume(driverID);
-    setAudioDeviceVolume(defaultDeviceID, driverVolume);
-    setDefaultOutputDevice(defaultDeviceID);
-    setDefaultSystemOutputDevice(defaultDeviceID);
-
-    AudioDeviceStop(driverID, inputIOProcId);
-    AudioDeviceStop(defaultDeviceID, outputIOProcID);
-
-    AudioDeviceDestroyIOProcID(driverID, inputIOProcId);
-    AudioDeviceDestroyIOProcID(defaultDeviceID, outputIOProcID);
-
-    std::exit(signum);
 }
 
 void updateConfig() {
@@ -579,6 +568,8 @@ OSStatus defaultDeviceIOProc(
         if (toCopy > 0) {
             std::copy(sharedBuffer.begin(), sharedBuffer.begin() + toCopy, outputData);
             sharedBuffer.erase(sharedBuffer.begin(), sharedBuffer.begin() + toCopy);
+        } else {
+            std::memset(outputData, 0, outBuffer.mDataByteSize);
         }
         bufferMutex.unlock();
     }
@@ -664,5 +655,20 @@ int main(int argc, char* argv[]) {
             lock.lock();
         }
     }
+
+    std::cerr << "[main] exiting main loop" << std::endl;
+    float driverVolume = getAudioDeviceVolume(driverID);
+    setAudioDeviceVolume(defaultDeviceID, driverVolume);
+    setDefaultOutputDevice(defaultDeviceID);
+    setDefaultSystemOutputDevice(defaultDeviceID);
+
+    AudioDeviceStop(driverID, inputIOProcId);
+    AudioDeviceStop(defaultDeviceID, outputIOProcID);
+
+    AudioDeviceDestroyIOProcID(driverID, inputIOProcId);
+    AudioDeviceDestroyIOProcID(defaultDeviceID, outputIOProcID);
+    std::cerr << "[main] cleanup done" << std::endl;
+
+    return 0;
 }
 

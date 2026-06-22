@@ -1,5 +1,8 @@
 #!/bin/sh
 
+VERSION=(`cat version`)
+
+echo Packing AudioFlow ${VERSION}
 
 # arch x86_64
 
@@ -10,14 +13,14 @@ mkdir -p pkgroot/Library/Audio/Plug-Ins/HAL
 
 cp -R ui/out/AudioFlow-darwin-x64/AudioFlow.app pkgroot/Applications/
 
-cp -R assets/driver/BlackHole.driver pkgroot/Library/Audio/Plug-Ins/HAL/
+cp -R driver/BlackHole.driver pkgroot/Library/Audio/Plug-Ins/HAL/
 
 
 pkgbuild \
     --root pkgroot \
     --scripts scripts \
     --identifier com.DrMoriarty.AudioFlow \
-    --version 2.0.0 \
+    --version "${VERSION}" \
     --install-location / \
     component.pkg
 
@@ -37,14 +40,14 @@ mkdir -p pkgroot/Library/Audio/Plug-Ins/HAL
 
 cp -R ui/out/AudioFlow-darwin-arm64/AudioFlow.app pkgroot/Applications/
 
-cp -R assets/driver/BlackHole.driver pkgroot/Library/Audio/Plug-Ins/HAL/
+cp -R driver/BlackHole.driver pkgroot/Library/Audio/Plug-Ins/HAL/
 
 
 pkgbuild \
     --root pkgroot \
     --scripts scripts \
     --identifier com.DrMoriarty.AudioFlow \
-    --version 2.0.0 \
+    --version "${VERSION}" \
     --install-location / \
     component.pkg
 

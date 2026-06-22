@@ -38,10 +38,12 @@ void Equalizer::process(std::vector<double>& input) {
         filter.process(left);
     }
     for (auto &filter: *filters) {
-        std::vector<double> savedState = std::move(filter.state);
-        filter.state = std::vector<double>(filter.a_coeffs.size(), 0.0);
+        std::vector<double> savedLeft;
+        std::swap(filter.state, savedLeft);
+        std::swap(filter.state, filter.rightState);
         filter.process(right);
-        filter.state = std::move(savedState);
+        std::swap(filter.state, filter.rightState);
+        std::swap(filter.state, savedLeft);
     }
 
     if (mixRemaining <= 0) {

@@ -15,7 +15,7 @@ module.exports = {
   },
   packagerConfig: {
       asar: true,
-      icon: '../assets/icon/AudioFlow',
+      icon: '../icon/AudioFlow',
       extraResource: [
 	  '../assets',
 	  '../build'

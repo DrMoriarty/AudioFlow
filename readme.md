@@ -48,7 +48,7 @@ To use AudioFlow, simply open the application and AudioFlow will automatically s
   * Adjustable mixing (dry/wet)
 
 ## User Interface
-<img src="assets/demo/ui.png" width="320">
+<img src="demo/ui.png" width="320">
 
 ## Issues
 Audioflow is currently incompatible with bluetooth audio devices.

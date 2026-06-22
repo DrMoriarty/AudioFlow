@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <installer-gui-script minSpecVersion="1">
     <title>AudioFlow</title>
-    <product id="com.DrMoriarty.AudioFlow" version="2.0.0"/>
+    <product id="com.DrMoriarty.AudioFlow" version="2.0.1"/>
     
     <!-- Текст, который увидит пользователь на первом экране -->
     <welcome file="welcome.html" mime-type="text/html" />
@@ -12,6 +12,6 @@
     
     <choice id="default" visible="false">
       <!-- Ваш компонентный пакет -->
-      <pkg-ref id="com.DrMoriarty.AudioFlow" version="2.0.0">component.pkg</pkg-ref>
+      <pkg-ref id="com.DrMoriarty.AudioFlow" version="2.0.1">component.pkg</pkg-ref>
     </choice>
 </installer-gui-script>

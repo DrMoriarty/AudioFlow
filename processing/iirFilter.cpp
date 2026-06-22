@@ -9,6 +9,7 @@ IIRFilter::IIRFilter(float f, float q, float g, float sampleRate)
 
     calculatePeakFilter();
     state = std::vector<double>(a_coeffs.size(), 0.0);
+    rightState = std::vector<double>(a_coeffs.size(), 0.0);
 }
 
 void IIRFilter::process(std::vector<double>& input) {

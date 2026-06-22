@@ -12,9 +12,9 @@ Config::Config(const std::string& configPath) : configFilePath(configPath) {
     ampGain = 0.0f;
 
     equalizerToggle = false;
-    equalizerF = {60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000};
-    equalizerQ = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-    equalizerG = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    equalizerF = {60.0f, 170.0f, 310.0f, 600.0f, 1000.0f, 3000.0f, 6000.0f, 12000.0f, 14000.0f, 16000.0f};
+    equalizerQ = {1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f, 1.41f};
+    equalizerG = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 
     reverbToggle = false;
     reverbDryWet = 0.0f;

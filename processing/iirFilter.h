@@ -36,6 +36,7 @@ public:
     std::vector<double> a_coeffs;
     std::vector<double> b_coeffs;
     std::vector<double> state;
+    std::vector<double> rightState;
 };
 
 
