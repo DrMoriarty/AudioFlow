@@ -143,6 +143,7 @@ function updateSliderPositions() {
     const qLabel = document.getElementById('qLabel');
     const eqContainer = document.getElementById('equalizerContainer');
     if (!hzLabel || !sliderLabelsDiv || !gainLabel || !qLabel || !eqContainer) return;
+    if (equalizerBody.style.display === 'none' || hzLabel.offsetParent === null) return;
 
     const containerTop = eqContainer.getBoundingClientRect().top;
 
@@ -421,6 +422,7 @@ for (const section of expandSections) {
         writeConfigToFile();
         section.body.style.display = expanded[section.key] ? 'block' : 'none';
         section.chevron.classList.toggle('collapsed', !expanded[section.key]);
+        updateSliderPositions();
         fitWindowToContent();
     });
 }
