@@ -10,7 +10,8 @@ const defaults = {
         g: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     },
     reverb: { toggle: false, dw: 0, ir: '' },
-    correction: { toggle: false, dw: 1.0, ir: '', recent: [] }
+    correction: { toggle: false, dw: 1.0, ir: '', recent: [] },
+    ui: { expanded: { correcting: true, preamplifier: true, equalizer: true, reverb: true, settings: true } }
 };
 
 // DOM Elements
@@ -43,6 +44,12 @@ const selectCorrectionIR = document.getElementById('selectCorrectionIR');
 const correctionIRButton = document.getElementById('correctionIRButton');
 const correctionDWSlider = document.getElementById('correctionDWSlider');
 const correctionDWBox = document.getElementById('correctionDWBox');
+
+const correctingChevron = document.getElementById('correctingChevron');
+const preamplifierChevron = document.getElementById('preamplifierChevron');
+const equalizerChevron = document.getElementById('equalizerChevron');
+const reverbChevron = document.getElementById('reverbChevron');
+const settingsChevron = document.getElementById('settingsChevron');
 
 function updateDryWetBoxPosition() {
     const slider = drywetSlider;
@@ -115,7 +122,6 @@ const selectOutputDevice = document.getElementById('selectOutputDevice');
 const equalizerBody = document.getElementById('equalizerBody');
 const reverbBody = document.getElementById('reverbBody');
 
-const settingsToggle = document.getElementById('settingsToggle');
 const settingsBody = document.getElementById('settingsBody');
 
 // Presets
@@ -135,14 +141,17 @@ function updateSliderPositions() {
     const sliderLabelsDiv = document.getElementById('sliderLabels');
     const gainLabel = document.getElementById('gainLabel');
     const qLabel = document.getElementById('qLabel');
-    if (!hzLabel || !sliderLabelsDiv || !gainLabel || !qLabel) return;
+    const eqContainer = document.getElementById('equalizerContainer');
+    if (!hzLabel || !sliderLabelsDiv || !gainLabel || !qLabel || !eqContainer) return;
 
-    const fBoxTop = Math.round(hzLabel.getBoundingClientRect().top);
-    const gainTop = Math.round(gainLabel.getBoundingClientRect().top);
-    const qTop = Math.round(qLabel.getBoundingClientRect().top);
+    const containerTop = eqContainer.getBoundingClientRect().top;
+
+    const fBoxTop = Math.round(hzLabel.getBoundingClientRect().top) - containerTop;
+    const gainTop = Math.round(gainLabel.getBoundingClientRect().top) - containerTop;
+    const qTop = Math.round(qLabel.getBoundingClientRect().top) - containerTop;
 
     const top30Top = Math.round(sliderLabelsDiv.children[0].getBoundingClientRect().top);
-    const sliderTop = top30Top + 108;
+    const sliderTop = top30Top + 108 - containerTop;
 
     for (let i = 0; i < bandLefts.length; i++) {
         const f = document.getElementById('fBox' + i);
@@ -186,11 +195,18 @@ const renderConfig = function () {
     preamplifierToggle.checked = configJSON['amplifier']['toggle'];
     correctingToggle.checked = configJSON['correction']['toggle'];
 
-    equalizerBody.style.display = equalizerToggle.checked ? 'block' : 'none';
-    reverbBody.style.display = reverbToggle.checked ? 'block' : 'none';
-    preamplifierBody.style.display = preamplifierToggle.checked ? 'block' : 'none';
-    correctingBody.style.display = correctingToggle.checked ? 'block' : 'none';
-    settingsBody.style.display = settingsToggle.checked ? 'block' : 'none';
+    const expanded = configJSON['ui']['expanded'];
+    correctingBody.style.display = expanded['correcting'] ? 'block' : 'none';
+    preamplifierBody.style.display = expanded['preamplifier'] ? 'block' : 'none';
+    equalizerBody.style.display = expanded['equalizer'] ? 'block' : 'none';
+    reverbBody.style.display = expanded['reverb'] ? 'block' : 'none';
+    settingsBody.style.display = expanded['settings'] ? 'block' : 'none';
+
+    correctingChevron.classList.toggle('collapsed', !expanded['correcting']);
+    preamplifierChevron.classList.toggle('collapsed', !expanded['preamplifier']);
+    equalizerChevron.classList.toggle('collapsed', !expanded['equalizer']);
+    reverbChevron.classList.toggle('collapsed', !expanded['reverb']);
+    settingsChevron.classList.toggle('collapsed', !expanded['settings']);
 
     preampSlider.value = configJSON['amplifier']['g'];
     preamplifierGainBox.value = configJSON['amplifier']['g'];
@@ -389,8 +405,24 @@ correctingToggle.oninput = async function () {
     renderConfig();
 }
 
-settingsToggle.oninput = function () {
-    renderConfig();
+
+// Chevron expand/collapse handlers
+const expandSections = [
+    { chevron: correctingChevron, key: 'correcting', body: correctingBody },
+    { chevron: preamplifierChevron, key: 'preamplifier', body: preamplifierBody },
+    { chevron: equalizerChevron, key: 'equalizer', body: equalizerBody },
+    { chevron: reverbChevron, key: 'reverb', body: reverbBody },
+    { chevron: settingsChevron, key: 'settings', body: settingsBody },
+];
+for (const section of expandSections) {
+    section.chevron.addEventListener('click', function () {
+        const expanded = configJSON['ui']['expanded'];
+        expanded[section.key] = !expanded[section.key];
+        writeConfigToFile();
+        section.body.style.display = expanded[section.key] ? 'block' : 'none';
+        section.chevron.classList.toggle('collapsed', !expanded[section.key]);
+        fitWindowToContent();
+    });
 }
 
 // Load config values and set event listeners for preamp
@@ -553,6 +585,18 @@ const init = async () => {
     if (configJSON['correction']['dw'] === undefined) {
         configJSON['correction']['dw'] = 1.0;
     }
+    if (!configJSON['ui']) {
+        configJSON['ui'] = structuredClone(defaults.ui);
+    }
+    if (!configJSON['ui']['expanded']) {
+        configJSON['ui']['expanded'] = structuredClone(defaults.ui.expanded);
+    }
+    const exp = configJSON['ui']['expanded'];
+    if (exp['correcting'] === undefined) exp['correcting'] = true;
+    if (exp['preamplifier'] === undefined) exp['preamplifier'] = true;
+    if (exp['equalizer'] === undefined) exp['equalizer'] = true;
+    if (exp['reverb'] === undefined) exp['reverb'] = true;
+    if (exp['settings'] === undefined) exp['settings'] = true;
     loadPresets();
     await loadOutputDevices();
     renderConfig();
