@@ -29,7 +29,7 @@ productbuild \
     --distribution distribution.xml \
     --package-path . \
     --resources . \
-    AudioFlow-x64.pkg
+    AudioFlow-${VERSION}-x64.pkg
 
 # arch arm64
 
@@ -56,7 +56,7 @@ productbuild \
     --distribution distribution.xml \
     --package-path . \
     --resources . \
-    AudioFlow-arm64.pkg
+    AudioFlow-${VERSION}-arm64.pkg
 
 # cleanup
 

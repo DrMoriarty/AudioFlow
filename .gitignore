@@ -10,3 +10,4 @@ cmake_install.cmake
 Makefile
 *.pkg
 .DS_Store
+*.tar.gz
