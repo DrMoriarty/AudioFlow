@@ -1,10 +1,16 @@
 const { app, BrowserWindow, ipcMain, dialog } = require('electron')
 const { spawn } = require('child_process');
 const path = require('path')
+const fs = require('fs');
 const readline = require('readline');
 
 const rootPath = path.resolve(path.dirname(__dirname), '..');
-const backendProcess = spawn(path.join(rootPath, '/build/AudioFlow'), [], {
+
+const userDataPath = app.getPath('userData');
+const configPath = path.join(userDataPath, 'config.json');
+fs.mkdirSync(userDataPath, { recursive: true });
+
+const backendProcess = spawn(path.join(rootPath, '/build/AudioFlow'), [configPath], {
     cwd: path.join(rootPath, '/build')
 });
 
@@ -53,6 +59,20 @@ backendProcess.on('exit', (code) => {
 backendProcess.on('error', (error) => {
     console.error(`Error executing file: ${error}`);
     app.quit();
+});
+
+ipcMain.handle('readConfig', async () => {
+    try {
+        return JSON.parse(fs.readFileSync(configPath));
+    } catch (e) {
+        return null;
+    }
+});
+
+ipcMain.handle('writeConfig', async (event, configJSON) => {
+    const tempPath = configPath + '.tmp';
+    fs.writeFileSync(tempPath, JSON.stringify(configJSON, null, 2));
+    fs.renameSync(tempPath, configPath);
 });
 
 ipcMain.handle('getAvailableOutputDevices', async () => {
@@ -124,6 +144,8 @@ ipcMain.handle('resizeWindow', async (event, width, height) => {
         }
     }
 });
+
+let win;
 
 const createWindow = () => {
     win = new BrowserWindow({

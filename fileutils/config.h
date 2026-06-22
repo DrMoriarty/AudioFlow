@@ -10,9 +10,11 @@
 
 class Config {
 public:
-    Config();
+    Config(const std::string& configPath = "../config.json");
 
     bool loadConfig();
+
+    std::string configFilePath;
 
     bool ampToggle;
     float ampGain;

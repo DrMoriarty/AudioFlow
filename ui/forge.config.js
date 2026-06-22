@@ -18,9 +18,7 @@ module.exports = {
       icon: '../assets/icon/AudioFlow',
       extraResource: [
 	  '../assets',
-	  '../build',
-	  '../scripts',
-	  '../config.json'
+	  '../build'
       ],
       extendInfo: {
 	  NSMicrophoneUsageDescription: 'AudioFlow needs microphone access to capture system audio via the BlackHole loopback driver for real-time equalization.'

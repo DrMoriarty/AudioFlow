@@ -1,5 +1,16 @@
 // Config
-let configJSON = window.electronAPI.readConfig();
+let configJSON;
+
+const defaults = {
+    amplifier: { toggle: false, g: 0 },
+    equalizer: {
+        toggle: false,
+        f: [60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000],
+        q: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+        g: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+    },
+    reverb: { toggle: false, dw: 0, ir: '' }
+};
 
 // DOM Elements
 const autoPreampToggle = document.getElementById('autoPreampToggle');
@@ -81,8 +92,8 @@ const settingsBody = document.getElementById('settingsBody');
 let equalizerPresets = {};
 let reverbPresets = {};
 
-const writeConfigToFile = function() {
-    window.electronAPI.writeConfig(configJSON);
+const writeConfigToFile = async function() {
+    await window.electronAPI.writeConfig(configJSON);
 };
 
 const bandLefts = [
@@ -427,9 +438,11 @@ drywetBox.onkeydown = async function(e) {
     }
 }
 
-const init = () => {
+const init = async () => {
+    configJSON = await window.electronAPI.readConfig();
+    if (!configJSON) configJSON = structuredClone(defaults);
     loadPresets();
-    loadOutputDevices();
+    await loadOutputDevices();
     renderConfig();
 };
 

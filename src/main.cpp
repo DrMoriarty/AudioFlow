@@ -29,7 +29,7 @@ std::mutex bufferMutex;
 std::unique_ptr<Processing> audioProcessor;
 std::mutex audioProcessorMutex;
 
-Config config;
+Config* gConfig = nullptr;
 
 std::atomic<bool> running{true};
 
@@ -385,8 +385,8 @@ bool setOutputDevice(const std::string& name) {
         deviceSampleRate = 48000.0f;
     }
 
-    config.loadConfig();
-    auto updated = std::make_unique<Processing>(config, getAudioDeviceVolume(driverID), deviceSampleRate);
+    gConfig->loadConfig();
+    auto updated = std::make_unique<Processing>(*gConfig, getAudioDeviceVolume(driverID), deviceSampleRate);
     audioProcessorMutex.lock();
     audioProcessor = std::move(updated);
     audioProcessorMutex.unlock();
@@ -523,9 +523,9 @@ void cleanup(int signum) {
 }
 
 void updateConfig() {
-    bool upToDate = config.loadConfig();
+    bool upToDate = gConfig->loadConfig();
     if (!upToDate || audioProcessor == nullptr) {
-        auto updated = std::make_unique<Processing>(config, audioProcessor.get(), getAudioDeviceVolume(driverID), deviceSampleRate);
+        auto updated = std::make_unique<Processing>(*gConfig, audioProcessor.get(), getAudioDeviceVolume(driverID), deviceSampleRate);
         audioProcessorMutex.lock();
         audioProcessor = std::move(updated);
         audioProcessorMutex.unlock();
@@ -586,7 +586,7 @@ OSStatus defaultDeviceIOProc(
     return noErr;
 }
 
-int main() {
+int main(int argc, char* argv[]) {
     driverID = 0;
     // Get device IDs
     std::map<UInt32, std::string> ad = getAudioDevices();
@@ -630,9 +630,14 @@ int main() {
         std::cerr << "Failed to set buffer size for default output device: " << defaultDeviceID << std::endl;
     }
 
-    config.loadConfig();
-    audioProcessor = std::make_unique<Processing>(config, getAudioDeviceVolume(driverID), deviceSampleRate);
-    audioProcessor = std::make_unique<Processing>(config, audioProcessor.get(), getAudioDeviceVolume(driverID), deviceSampleRate);
+    std::string configPath = "../config.json";
+    if (argc > 1) {
+        configPath = argv[1];
+    }
+    gConfig = new Config(configPath);
+
+    audioProcessor = std::make_unique<Processing>(*gConfig, getAudioDeviceVolume(driverID), deviceSampleRate);
+    audioProcessor = std::make_unique<Processing>(*gConfig, audioProcessor.get(), getAudioDeviceVolume(driverID), deviceSampleRate);
 
     // Create audio device processes
     AudioDeviceCreateIOProcID(driverID, driverIOProc, nullptr, &inputIOProcId);

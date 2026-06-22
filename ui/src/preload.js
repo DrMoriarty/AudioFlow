@@ -2,27 +2,19 @@ const { contextBridge, ipcRenderer } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
-// Paths
 const rootPath = path.resolve(path.dirname(__dirname), '..');
-const configPath = path.join(rootPath, 'config.json');
 const assetsPath = path.join(rootPath, 'assets');
 const equalizerPresetsPath = path.join(assetsPath, 'eq');
 const reverbPresetsPath = path.join(assetsPath, 'ir');
 
-// Expose protected methods to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
     node: () => process.versions.node,
     chrome: () => process.versions.chrome,
     electron: () => process.versions.electron,
 
-    readConfig: () => {
-        return JSON.parse(fs.readFileSync(configPath));
-    },
-    writeConfig: (configJSON) => {
-        const tempFilePath = path.join(rootPath, 'config.tmp');
-        fs.writeFileSync(tempFilePath, JSON.stringify(configJSON, null, 2));
-        fs.renameSync(tempFilePath, configPath);
-    },
+    readConfig: () => ipcRenderer.invoke('readConfig'),
+    writeConfig: (configJSON) => ipcRenderer.invoke('writeConfig', configJSON),
+
     getEqualizerPresets: () => {
         const files = fs.readdirSync(equalizerPresetsPath);
         const filesDict = {};

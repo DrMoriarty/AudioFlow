@@ -7,8 +7,38 @@
 #include <vector>
 #include <cstring>
 #include <cmath>
+#include <sys/stat.h>
+#include <CoreFoundation/CoreFoundation.h>
 #include "readIRFile.h"
 #include "../fileutils/globals.h"
+
+static std::string getExeDir() {
+    static std::string cached;
+    if (!cached.empty()) return cached;
+
+    CFURLRef url = CFBundleCopyExecutableURL(CFBundleGetMainBundle());
+    if (url) {
+        CFURLRef dir = CFURLCreateCopyDeletingLastPathComponent(nullptr, url);
+        char buf[PATH_MAX];
+        if (CFURLGetFileSystemRepresentation(dir, true, reinterpret_cast<UInt8*>(buf), PATH_MAX)) {
+            cached = buf;
+        }
+        if (dir) CFRelease(dir);
+        CFRelease(url);
+    }
+    return cached;
+}
+
+static std::string resolvePath(const std::string& path) {
+    if (path.empty() || path[0] == '/') return path;
+    struct stat s;
+    if (stat(path.c_str(), &s) == 0) return path;
+    std::string exeDir = getExeDir();
+    if (exeDir.empty()) return path;
+    std::string resolved = exeDir + "/" + path;
+    if (stat(resolved.c_str(), &s) == 0) return resolved;
+    return path;
+}
 
 void resampleIR(std::vector<float> &buffer, double srcRate, double dstRate) {
     if (srcRate == dstRate || buffer.empty() || srcRate <= 0.0 || dstRate <= 0.0) return;
@@ -47,9 +77,11 @@ IRData readIRFile(const std::string &path, uint32_t deviceSampleRate) {
     IRData result;
     result.sampleRate = 0;
 
-    std::ifstream file(path, std::ios::binary);
+    std::string absPath = resolvePath(path);
+
+    std::ifstream file(absPath, std::ios::binary);
     if (!file) {
-        std::cerr << "Cannot open file: " << path << std::endl;
+        std::cerr << "Cannot open file: " << absPath << " from path: " << path  << std::endl;
         return result;
     }
 

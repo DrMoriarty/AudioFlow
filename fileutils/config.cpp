@@ -7,12 +7,30 @@
 
 using json = nlohmann::json;
 
-Config::Config() {
+Config::Config(const std::string& configPath) : configFilePath(configPath) {
+    ampToggle = false;
+    ampGain = 0.0f;
+
+    equalizerToggle = false;
+    equalizerF = {60, 170, 310, 600, 1000, 3000, 6000, 12000, 14000, 16000};
+    equalizerQ = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+    equalizerG = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+    reverbToggle = false;
+    reverbDryWet = 0.0f;
+    irFilePath = "";
+
     loadConfig();
 }
 
 bool Config::loadConfig() {
-    std::ifstream f("../config.json");
+    std::ifstream f(configFilePath);
+    if (!f.is_open()) {
+        std::cerr << "[Config] Cannot open config file: " << configFilePath << std::endl;
+        return true;
+    }
+    std::cerr << "[Config] Loaded config from: " << configFilePath << std::endl;
+
     json data = json::parse(f);
 
     bool ampToggle = data.at("amplifier").at("toggle").get<bool>();

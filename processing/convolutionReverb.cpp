@@ -13,9 +13,14 @@ ConvolutionReverb::ConvolutionReverb(bool toggle, std::string path, double dryWe
     numBins = paddedSize / 2;
     numChunks = 0;
 
-    IRData irData = readIRFile(path, static_cast<uint32_t>(deviceSampleRate));
+    IRData irData;
+    irData.sampleRate = 0;
 
     fftSetup = vDSP_create_fftsetup(static_cast<vDSP_Length>(std::log2(paddedSize)), FFT_RADIX2);
+
+    if (!path.empty()) {
+        irData = readIRFile(path, static_cast<uint32_t>(deviceSampleRate));
+    }
 
     if (!irData.audioDataL.empty() && !irData.audioDataR.empty()) {
         numChunks = static_cast<size_t>(std::ceil(static_cast<float>(irData.audioDataL.size()) / chunkSize));
