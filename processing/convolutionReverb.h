@@ -1,4 +1,6 @@
 //
+// Convolution reverb processor — overlap-save FFT implementation
+//
 // Created by Jeremi Campagna on 2024-07-17.
 //
 
@@ -47,6 +49,7 @@ private:
     std::vector<float> overlapR;
 
     SplitComplex fftReal;
+    std::vector<float> inputPadded;
 
     SplitComplex workerRealL;
     SplitComplex workerRealR;
@@ -56,6 +59,18 @@ private:
     std::vector<float> overlapReverbR;
 
     size_t numChunks;
+
+    SplitComplex ifftTmp;
+
+    std::vector<float> accumL;
+    std::vector<float> accumR;
+    std::vector<float> drainL;
+    std::vector<float> drainR;
+
+    std::vector<float> inputL;
+    std::vector<float> inputR;
+    std::vector<float> outputL;
+    std::vector<float> outputR;
 
     void fftZ(const std::vector<float>& input, float* outReal, float* outImag);
     void ifftZ(SplitComplex& workerReal, std::vector<float>& iblitted);

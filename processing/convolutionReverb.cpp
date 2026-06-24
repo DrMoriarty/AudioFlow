@@ -67,6 +67,9 @@ ConvolutionReverb::ConvolutionReverb(bool toggle, std::string path, double dryWe
     iblittedR.resize(paddedSize, 0.0f);
     overlapReverbL.resize(totalSize, 0.0f);
     overlapReverbR.resize(totalSize, 0.0f);
+
+    inputPadded.resize(paddedSize, 0.0f);
+    ifftTmp = {std::vector<float>(numBins), std::vector<float>(numBins)};
 }
 
 ConvolutionReverb::~ConvolutionReverb() {
@@ -86,10 +89,9 @@ void ConvolutionReverb::fftZ(const std::vector<float>& input, float* outReal, fl
 }
 
 void ConvolutionReverb::ifftZ(SplitComplex& workerReal, std::vector<float>& iblitted) {
-    std::vector<float> tmpReal(numBins), tmpImag(numBins);
-    std::copy(workerReal.real.begin(), workerReal.real.end(), tmpReal.begin());
-    std::copy(workerReal.imag.begin(), workerReal.imag.end(), tmpImag.begin());
-    DSPSplitComplex sc = { tmpReal.data(), tmpImag.data() };
+    std::copy(workerReal.real.begin(), workerReal.real.end(), ifftTmp.real.begin());
+    std::copy(workerReal.imag.begin(), workerReal.imag.end(), ifftTmp.imag.begin());
+    DSPSplitComplex sc = ifftTmp.dsp();
     vDSP_fft_zrip(fftSetup, &sc, 1, static_cast<vDSP_Length>(std::log2(paddedSize)), FFT_INVERSE);
     vDSP_ztoc(&sc, 1, reinterpret_cast<COMPLEX*>(iblitted.data()), 2, numBins);
     const float factor = 1.0f / static_cast<float>(paddedSize);
@@ -103,7 +105,6 @@ void ConvolutionReverb::convolveChannel(const std::vector<float>& input, std::ve
     const size_t inputSize = input.size();
     const size_t totalSize = overlap.size();
 
-    std::vector<float> inputPadded(paddedSize, 0.0f);
     std::copy(input.begin(), input.end(), inputPadded.begin());
     fftZ(inputPadded, fftReal.real.data(), fftReal.imag.data());
 
@@ -144,39 +145,54 @@ void ConvolutionReverb::process(std::vector<float>& input) {
     const size_t inputSize = input.size();
     const size_t numFrames = inputSize / 2;
 
-    std::vector<float> inputL(numFrames);
-    std::vector<float> inputR(numFrames);
-    std::vector<float> outputL(numFrames);
-    std::vector<float> outputR(numFrames);
-
     for (size_t i = 0; i < numFrames; ++i) {
-        inputL[i] = input[2 * i];
-        inputR[i] = input[2 * i + 1];
+        accumL.push_back(input[2 * i]);
+        accumR.push_back(input[2 * i + 1]);
     }
 
-    std::fill(overlapReverbL.begin(), overlapReverbL.end(), 0.0f);
-    std::fill(overlapReverbR.begin(), overlapReverbR.end(), 0.0f);
+    inputL.resize(chunkSize);
+    inputR.resize(chunkSize);
+    outputL.resize(chunkSize);
+    outputR.resize(chunkSize);
 
-    convolveChannel(inputL, outputL, irFFTsL, overlapL,
-                    workerRealL, iblittedL, overlapReverbL);
-    convolveChannel(inputR, outputR, irFFTsR, overlapR,
-                    workerRealR, iblittedR, overlapReverbR);
+    while (accumL.size() >= chunkSize) {
+        std::copy(accumL.begin(), accumL.begin() + chunkSize, inputL.begin());
+        std::copy(accumR.begin(), accumR.begin() + chunkSize, inputR.begin());
 
-    bool mixConst = dryWet.getRemaining() <= 0 && mix.getRemaining() <= 0;
-    if (mixConst) {
-        float scale = static_cast<float>(dryWet.currentValueNoChange() * mix.currentValueNoChange());
-        float oneMinusScale = 1.0f - scale;
-        for (size_t i = 0; i < numFrames; ++i) {
-            input[2 * i]     = outputL[i]  * scale + input[2 * i]     * oneMinusScale;
-            input[2 * i + 1] = outputR[i]  * scale + input[2 * i + 1] * oneMinusScale;
+        accumL.erase(accumL.begin(), accumL.begin() + chunkSize);
+        accumR.erase(accumR.begin(), accumR.begin() + chunkSize);
+
+        std::fill(overlapReverbL.begin(), overlapReverbL.end(), 0.0f);
+        std::fill(overlapReverbR.begin(), overlapReverbR.end(), 0.0f);
+
+        convolveChannel(inputL, outputL, irFFTsL, overlapL,
+                        workerRealL, iblittedL, overlapReverbL);
+        convolveChannel(inputR, outputR, irFFTsR, overlapR,
+                        workerRealR, iblittedR, overlapReverbR);
+
+        drainL.insert(drainL.end(), outputL.begin(), outputL.begin() + chunkSize);
+        drainR.insert(drainR.end(), outputR.begin(), outputR.begin() + chunkSize);
+    }
+
+    if (drainL.size() >= numFrames) {
+        bool mixConst = dryWet.getRemaining() <= 0 && mix.getRemaining() <= 0;
+        if (mixConst) {
+            float scale = static_cast<float>(dryWet.currentValueNoChange() * mix.currentValueNoChange());
+            float oneMinusScale = 1.0f - scale;
+            for (size_t i = 0; i < numFrames; ++i) {
+                input[2 * i]     = drainL[i] * scale + input[2 * i]     * oneMinusScale;
+                input[2 * i + 1] = drainR[i] * scale + input[2 * i + 1] * oneMinusScale;
+            }
+        } else {
+            for (size_t i = 0; i < numFrames; ++i) {
+                float wetScale = static_cast<float>(dryWet.currentValue() * mix.currentValue());
+                float oneMinusScale = 1.0f - wetScale;
+                input[2 * i]     = drainL[i] * wetScale + input[2 * i]     * oneMinusScale;
+                input[2 * i + 1] = drainR[i] * wetScale + input[2 * i + 1] * oneMinusScale;
+            }
         }
-    } else {
-        for (size_t i = 0; i < numFrames; ++i) {
-            float wetScale = static_cast<float>(dryWet.currentValue() * mix.currentValue());
-            float oneMinusScale = 1.0f - wetScale;
-            input[2 * i]     = outputL[i]  * wetScale + input[2 * i]     * oneMinusScale;
-            input[2 * i + 1] = outputR[i]  * wetScale + input[2 * i + 1] * oneMinusScale;
-        }
+        drainL.erase(drainL.begin(), drainL.begin() + numFrames);
+        drainR.erase(drainR.begin(), drainR.begin() + numFrames);
     }
 }
 

@@ -9,4 +9,4 @@ std::string driver2 = "BlackHole 2ch";
 int bufferSize = 4096;
 int smootherSteps = 256;
 int volumeSmootherSteps = 8192;
-int convolutionChunkSize = 16384;
+int convolutionChunkSize = 1024;

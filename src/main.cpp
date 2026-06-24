@@ -433,7 +433,6 @@ auto dispatchToMainThread(F&& func) -> decltype(func()) {
 
 void handleCommand(const std::string& line) {
     try {
-        std::cerr << "Command: " << line << std::endl;
         auto cmd = json::parse(line);
         std::string action = cmd["action"];
 
