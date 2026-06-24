@@ -2,7 +2,7 @@
 AudioFlow is a MacOS system audio equalizer designed to be simple, lightweight, and robust. AudioFlow currently features a 10 band equalizer and a convolution reverb unit. AudioFlow is built in C++ and is powered by Apple's CoreAudio and Accelerate frameworks.
 
 ## Demo
-https://github.com/user-attachments/assets/41a625e8-e656-4a86-a6b3-8140cdd7d376
+https://github.com/DrMoriarty/AudioFlow/blob/a6ccbc80b21e5cf2f1a12af2f48c323bdeebab8a/demo/demo.mov
 
 ## Table of Contents
 - [Installation Instructions](#installation-instructions)
