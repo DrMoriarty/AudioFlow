@@ -140,6 +140,11 @@ ipcMain.handle('setEqualizerBand', async (event, index, f, q, g) => {
     return result.success || false;
 });
 
+ipcMain.handle('setBufferSize', async (event, value) => {
+    const result = await sendCommand({ action: 'setBufferSize', value });
+    return result.success || false;
+});
+
 ipcMain.handle('showOpenFileDialog', async () => {
     if (!win || win.isDestroyed()) return null;
     const result = await dialog.showOpenDialog(win, {

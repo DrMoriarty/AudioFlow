@@ -11,6 +11,7 @@
 #include <memory>
 #include <thread>
 #include <atomic>
+#include <condition_variable>
 #include "processing.h"
 #include "../fileutils/globals.h"
 #include "../lib/json.hpp"
@@ -24,8 +25,14 @@ float deviceSampleRate;
 AudioDeviceIOProcID inputIOProcId;
 AudioDeviceIOProcID outputIOProcID;
 
-std::vector<float> sharedBuffer;
-std::mutex bufferMutex;
+std::vector<float> inputBuffer;
+std::vector<float> processBuffer;
+std::vector<float> outputBuffer;
+std::mutex inputMutex;
+std::mutex processMutex;
+
+std::thread audioWorkerThread;
+std::condition_variable processCV;
 
 std::unique_ptr<Processing> audioProcessor;
 std::mutex audioProcessorMutex;
@@ -370,7 +377,15 @@ bool setOutputDevice(const std::string& name) {
     AudioDeviceDestroyIOProcID(driverID, inputIOProcId);
     AudioDeviceDestroyIOProcID(defaultDeviceID, outputIOProcID);
 
-    sharedBuffer.clear();
+    {
+        std::lock_guard<std::mutex> lock(inputMutex);
+        inputBuffer.clear();
+    }
+    {
+        std::lock_guard<std::mutex> lock(processMutex);
+        processBuffer.clear();
+        outputBuffer.clear();
+    }
 
     defaultDeviceID = newDeviceID;
     setAudioDeviceVolume(defaultDeviceID, 1);
@@ -418,6 +433,7 @@ auto dispatchToMainThread(F&& func) -> decltype(func()) {
 
 void handleCommand(const std::string& line) {
     try {
+        std::cerr << "Command: " << line << std::endl;
         auto cmd = json::parse(line);
         std::string action = cmd["action"];
 
@@ -509,6 +525,40 @@ void handleCommand(const std::string& line) {
             audioProcessorMutex.unlock();
             json response = {{"success", true}};
             std::cout << response.dump() << std::endl;
+        } else if (action == "setBufferSize") {
+            int newBufSize = cmd["value"];
+            static const int allowed[] = {256, 512, 1024, 2048, 4096, 8192, 16384};
+            bool valid = false;
+            for (int v : allowed) { if (v == newBufSize) { valid = true; break; } }
+            if (!valid) {
+                json response = {{"error", "invalid buffer size"}};
+                std::cout << response.dump() << std::endl;
+            } else {
+                bool success = dispatchToMainThread([newBufSize]() {
+                    AudioDeviceStop(driverID, inputIOProcId);
+                    AudioDeviceStop(defaultDeviceID, outputIOProcID);
+
+                    bufferSize = newBufSize;
+                    setAudioDeviceBufferSize(driverID, newBufSize);
+                    setAudioDeviceBufferSize(defaultDeviceID, newBufSize);
+
+                    {
+                        std::lock_guard<std::mutex> lock(inputMutex);
+                        inputBuffer.clear();
+                    }
+                    {
+                        std::lock_guard<std::mutex> lock(processMutex);
+                        processBuffer.clear();
+                        outputBuffer.clear();
+                    }
+
+                    AudioDeviceStart(driverID, inputIOProcId);
+                    AudioDeviceStart(defaultDeviceID, outputIOProcID);
+                    return true;
+                });
+                json response = {{"success", success}};
+                std::cout << response.dump() << std::endl;
+            }
         } else {
             json response = {{"error", "unknown action"}};
             std::cout << response.dump() << std::endl;
@@ -530,6 +580,37 @@ void commandLoop() {
 
 void cleanup(int signum) {
     running = false;
+    processCV.notify_one();
+}
+
+void audioWorker() {
+    while (running) {
+        std::vector<float> chunk;
+        {
+            std::unique_lock<std::mutex> lock(inputMutex);
+            processCV.wait_for(lock, std::chrono::milliseconds(100), [] {
+                return !inputBuffer.empty() || !running;
+            });
+            if (!running) break;
+            if (inputBuffer.empty()) continue;
+            size_t chunkSize = static_cast<size_t>(2 * bufferSize);
+            size_t toProcess = std::min(chunkSize, inputBuffer.size());
+            chunk.assign(inputBuffer.begin(), inputBuffer.begin() + toProcess);
+            inputBuffer.erase(inputBuffer.begin(), inputBuffer.begin() + toProcess);
+        }
+
+        audioProcessor->process(chunk);
+
+        {
+            std::lock_guard<std::mutex> lock(processMutex);
+            outputBuffer.insert(outputBuffer.end(), chunk.begin(), chunk.end());
+
+            size_t maxOutput = static_cast<size_t>(8 * bufferSize);
+            if (outputBuffer.size() > maxOutput) {
+                outputBuffer.erase(outputBuffer.begin(), outputBuffer.begin() + (outputBuffer.size() - maxOutput));
+            }
+        }
+    }
 }
 
 void updateConfig() {
@@ -556,15 +637,19 @@ OSStatus driverIOProc(
         float* audioData = (float*)buffer.mData;
         UInt32 numSamples = buffer.mDataByteSize / sizeof(float);
 
-        //updateConfig();
+        {
+            std::lock_guard<std::mutex> lock(inputMutex);
+            inputBuffer.insert(inputBuffer.end(), audioData, audioData + numSamples);
 
-        bufferMutex.lock();
-        sharedBuffer.insert(sharedBuffer.end(), audioData, audioData + numSamples);
+            size_t maxInput = static_cast<size_t>(8 * bufferSize);
+            if (inputBuffer.size() > maxInput) {
+                inputBuffer.erase(inputBuffer.begin(), inputBuffer.begin() + (inputBuffer.size() - maxInput));
+            }
 
-        if (sharedBuffer.size() == 2 * bufferSize) {  // TODO: change processing logic
-            audioProcessor->process(sharedBuffer);
+            if (inputBuffer.size() >= static_cast<size_t>(2 * bufferSize)) {
+                processCV.notify_one();
+            }
         }
-        bufferMutex.unlock();
     }
 
     return noErr;
@@ -584,15 +669,14 @@ OSStatus defaultDeviceIOProc(
         float* outputData = (float*)outBuffer.mData;
         UInt32 numSamples = outBuffer.mDataByteSize / sizeof(float);
 
-        bufferMutex.lock();
-        size_t toCopy = std::min<size_t>(numSamples, sharedBuffer.size());
+        std::lock_guard<std::mutex> lock(processMutex);
+        size_t toCopy = std::min<size_t>(numSamples, outputBuffer.size());
         if (toCopy > 0) {
-            std::copy(sharedBuffer.begin(), sharedBuffer.begin() + toCopy, outputData);
-            sharedBuffer.erase(sharedBuffer.begin(), sharedBuffer.begin() + toCopy);
+            std::copy(outputBuffer.begin(), outputBuffer.begin() + toCopy, outputData);
+            outputBuffer.erase(outputBuffer.begin(), outputBuffer.begin() + toCopy);
         } else {
             std::memset(outputData, 0, outBuffer.mDataByteSize);
         }
-        bufferMutex.unlock();
     }
 
     return noErr;
@@ -633,20 +717,21 @@ int main(int argc, char* argv[]) {
         deviceSampleRate = 48000.0f;
     }
 
+    std::string configPath = "../config.json";
+    if (argc > 1) {
+        configPath = argv[1];
+    }
+    gConfig = new Config(configPath);
+    bufferSize = gConfig->bufferSize;
+
     // Set buffer size
-    UInt32 bufferSizeInFrames = bufferSize; // Choose your desired buffer size
+    UInt32 bufferSizeInFrames = bufferSize;
     if (!setAudioDeviceBufferSize(driverID, bufferSizeInFrames)) {
         std::cerr << "Failed to set buffer size for driver device: " << driverID << std::endl;
     }
     if (!setAudioDeviceBufferSize(defaultDeviceID, bufferSizeInFrames)) {
         std::cerr << "Failed to set buffer size for default output device: " << defaultDeviceID << std::endl;
     }
-
-    std::string configPath = "../config.json";
-    if (argc > 1) {
-        configPath = argv[1];
-    }
-    gConfig = new Config(configPath);
 
     audioProcessor = std::make_unique<Processing>(*gConfig, getAudioDeviceVolume(driverID), deviceSampleRate);
     audioProcessor = std::make_unique<Processing>(*gConfig, audioProcessor.get(), getAudioDeviceVolume(driverID), deviceSampleRate);
@@ -658,6 +743,8 @@ int main(int argc, char* argv[]) {
     // Open the audio device for input or output
     AudioDeviceStart(driverID, inputIOProcId);
     AudioDeviceStart(defaultDeviceID, outputIOProcID);
+
+    audioWorkerThread = std::thread(audioWorker);
 
     std::signal(SIGINT, cleanup);
     std::signal(SIGTERM, cleanup);
@@ -678,6 +765,11 @@ int main(int argc, char* argv[]) {
     }
 
     std::cerr << "[main] exiting main loop" << std::endl;
+
+    if (audioWorkerThread.joinable()) {
+        audioWorkerThread.join();
+    }
+
     float driverVolume = getAudioDeviceVolume(driverID);
     setAudioDeviceVolume(defaultDeviceID, driverVolume);
     setDefaultOutputDevice(defaultDeviceID);

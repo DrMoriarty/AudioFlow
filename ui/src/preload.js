@@ -52,5 +52,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setAmplifierToggle: (toggle) => ipcRenderer.invoke('setAmplifierToggle', toggle),
     setAmplifierGain: (gain) => ipcRenderer.invoke('setAmplifierGain', gain),
     setEqualizerBand: (index, f, q, g) => ipcRenderer.invoke('setEqualizerBand', index, f, q, g),
+    setBufferSize: (value) => ipcRenderer.invoke('setBufferSize', value),
     resizeWindow: (width, height) => ipcRenderer.invoke('resizeWindow', width, height),
 });

@@ -11,6 +11,7 @@ const defaults = {
     },
     reverb: { toggle: false, dw: 0, ir: '' },
     correction: { toggle: false, dw: 1.0, ir: '', recent: [] },
+    bufferSize: 4096,
     ui: { expanded: { correcting: true, preamplifier: true, equalizer: true, reverb: true, settings: true } }
 };
 
@@ -123,6 +124,8 @@ const equalizerBody = document.getElementById('equalizerBody');
 const reverbBody = document.getElementById('reverbBody');
 
 const settingsBody = document.getElementById('settingsBody');
+
+const selectBufferSize = document.getElementById('selectBufferSize');
 
 // Presets
 let equalizerPresets = {};
@@ -263,6 +266,8 @@ const renderConfig = function () {
         selectCorrectionIR.value = configJSON['correction']['ir'];
     }
 
+    selectBufferSize.value = String(configJSON['bufferSize'] || 4096);
+
     updateSliderPositions();
     fitWindowToContent();
     requestAnimationFrame(updateDryWetBoxPosition);
@@ -307,6 +312,13 @@ selectOutputDevice.addEventListener('change', async function () {
     await window.electronAPI.setOutputDevice(selectedDevice);
     const currentDevice = await window.electronAPI.getCurrentOutputDeviceName();
     selectOutputDevice.value = currentDevice;
+});
+
+selectBufferSize.addEventListener('change', async function () {
+    const value = parseInt(selectBufferSize.value);
+    configJSON['bufferSize'] = value;
+    writeConfigToFile();
+    await window.electronAPI.setBufferSize(value);
 });
 
 // Set event listeners for presets
@@ -599,6 +611,9 @@ const init = async () => {
     if (exp['equalizer'] === undefined) exp['equalizer'] = true;
     if (exp['reverb'] === undefined) exp['reverb'] = true;
     if (exp['settings'] === undefined) exp['settings'] = true;
+    if (!configJSON['bufferSize']) {
+        configJSON['bufferSize'] = 4096;
+    }
     loadPresets();
     await loadOutputDevices();
     renderConfig();

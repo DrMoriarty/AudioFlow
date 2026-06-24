@@ -23,6 +23,8 @@ Config::Config(const std::string& configPath) : configFilePath(configPath) {
     correctionToggle = false;
     correctionIRFilePath = "";
 
+    bufferSize = 4096;
+
     loadConfig();
 }
 
@@ -52,7 +54,9 @@ bool Config::loadConfig() {
     float correctionDryWet = data.contains("correction") && data["correction"].contains("dw") ? data["correction"]["dw"].get<float>() : 1.0f;
     std::string correctionIRFilePath = data.contains("correction") && data["correction"].contains("ir") ? data["correction"]["ir"].get<std::string>() : "";
 
-    if (ampToggle != this->ampToggle || ampGain != this->ampGain || equalizerToggle != this->equalizerToggle || equalizerF != this->equalizerF || equalizerQ != this->equalizerQ || equalizerG != this->equalizerG || reverbToggle != this->reverbToggle || reverbDryWet != this->reverbDryWet || irFilePath != this->irFilePath || correctionToggle != this->correctionToggle || correctionDryWet != this->correctionDryWet || correctionIRFilePath != this->correctionIRFilePath) {
+    int bufferSize = data.contains("bufferSize") ? data["bufferSize"].get<int>() : 4096;
+
+    if (ampToggle != this->ampToggle || ampGain != this->ampGain || equalizerToggle != this->equalizerToggle || equalizerF != this->equalizerF || equalizerQ != this->equalizerQ || equalizerG != this->equalizerG || reverbToggle != this->reverbToggle || reverbDryWet != this->reverbDryWet || irFilePath != this->irFilePath || correctionToggle != this->correctionToggle || correctionDryWet != this->correctionDryWet || correctionIRFilePath != this->correctionIRFilePath || bufferSize != this->bufferSize) {
         this->ampToggle = ampToggle;
         this->ampGain = ampGain;
 
@@ -68,6 +72,8 @@ bool Config::loadConfig() {
         this->correctionToggle = correctionToggle;
         this->correctionDryWet = correctionDryWet;
         this->correctionIRFilePath = correctionIRFilePath;
+
+        this->bufferSize = bufferSize;
 
         return false;
     }

@@ -31,6 +31,8 @@ public:
     bool correctionToggle;
     float correctionDryWet;
     std::string correctionIRFilePath;
+
+    int bufferSize;
 };
 
 
