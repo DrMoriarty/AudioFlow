@@ -15,31 +15,46 @@ https://github.com/user-attachments/assets/401bd529-38a8-45b8-9256-b46ff55a88d3
 - [Credits](#credits)
 
 ## Installation Instructions
-1. Download the most recent release from https://github.com/jeremicna/AudioFlow/releases
-2. Navigate to:\
-```cd {PATH_TO_RELEASE}/AudioFlow.app```
-3. Execute the installer:\
-```sh Contents/Resources/scripts/installer.sh```\
-Note: This script may prompt password input as it moves the virtual audio device driver from ```assets/driver``` to ```/Library/Audio/Plug-Ins/HAL``` which requires administrator privileges. Alternatively, it is possible to manually move it. This script also temporarily contains a command which disables the apple quarantine the prevents the app from being opened due to the fact the builds are not currently notarized. 
-4. Restart CoreAudio:\
-```sudo killall -9 coreaudiod```
+
+### The easy way
+
+Download the latest pkg from the releases page and install it. The package contains all needed dependencies (BlackHole audio driver) and it will install them at once.
+
+Reboot the system. It is required by BlackHole driver.
+
+### The easy way 2
+
+Run `brew install --cask drmoriarty/audioflow/audioflow`
+It also installs `blackhole-2ch` as a dependency.
+
+Reboot the system. It is required by BlackHole driver.
+
+### Not very easy way
+
+Download or clone this repository. Ensure that CMake is installed in your system. Run `build.sh` script from the repository folder. It should build the application and you will be able to run it at `ui/out/AudioFlow-darwin-<your arch>` folder.
+
+I assume that you know what you do and it is not needed to speak about dependencies and so on.
 
 ## Uninstallation Instructions
-1. Navigate to:\
-   ```cd /Applications/AudioFlow.app```
-2. Execute the uninstaller:
-   ```sh Contents/Resources/scripts/uninstaller.sh```
-3. Restart CoreAudio:\
-   ```sudo killall -9 coreaudiod```
+
+Remove `AudioFlow.app` from your `/Application` directory as usual. Remove `BlackHole.driver` from `/Library/Audio/Plug-Ins/HAL/` if you dont need it. 
+
+Use `brew uninstall audioflow` if you used brew for installation.
 
 ## Usage
 To use AudioFlow, simply open the application and AudioFlow will automatically switch to the ```AudioFlow 2ch``` audio device and route the processed audio to the last selected audio device.
 
 ## Features
+* Convolution based frequency correction module
+  * Adjustable mixing (dry/wet)
+
+* Preamplifier
+  * Auto preamplification
+  * +-30 dB
+    
 * Equalizer
   * 10 Bands
   * Simple presets
-  * Auto preamplification
   * Adjustable gain, frequency, and quality factor (Q)
 
 * Reverb unit
